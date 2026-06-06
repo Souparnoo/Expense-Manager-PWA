@@ -123,7 +123,7 @@ export default function SettlementPage() {
                         startIcon={<AddIcon />}
                         onClick={() => {
                           setSettleDialog(friend.id);
-                          setSettleDirection(net < 0 ? 'friend_paid_me' : 'i_paid_friend');
+                          setSettleDirection(net > 0 ? 'i_paid_friend' : 'friend_paid_me');
                           setSettleAmount('');
                           setSettleNote('');
                         }}

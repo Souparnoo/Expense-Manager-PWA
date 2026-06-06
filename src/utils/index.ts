@@ -89,7 +89,7 @@ export function calcFriendBalances(
 
     // net > 0: I owe friend, net < 0: friend owes me
     const rawNet = iOweFriend - friendOwesMe;
-    const net = rawNet - settlementNet;
+    const net = rawNet + settlementNet;
 
     return {
       friend,
