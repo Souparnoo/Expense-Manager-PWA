@@ -114,7 +114,7 @@ export function exportToExcel(
       .reduce((s, e) => s + e.amount, 0);
     const settlementNet = friendSettlements.reduce((s, se) => s + se.amount, 0);
     const rawNet = iOweFriend - friendOwesMe;
-    const net = rawNet - settlementNet;
+    const net = rawNet + settlementNet;
 
     let status = '';
     if (net > 0) status = `I owe ${friend.name} ${Math.abs(net).toFixed(2)}`;
