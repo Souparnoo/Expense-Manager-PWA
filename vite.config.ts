@@ -18,8 +18,8 @@ export default defineConfig({
         background_color: '#0A0E1A',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: '/Expense-Manager-PWA/',
+        start_url: '/Expense-Manager-PWA/',
         icons: [
           {
             src: 'pwa-192x192.png',
