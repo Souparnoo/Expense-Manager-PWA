@@ -1,8 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  Box, Chip, Typography, IconButton, Menu, MenuItem,
-  Snackbar, Alert
-} from '@mui/material';
+import { Box, Chip, Typography, IconButton, Menu, MenuItem, Snackbar, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useApp } from '../../hooks/useApp';
@@ -16,9 +13,9 @@ interface Props {
 
 export default function QuickExpenseButtons({ onManage }: Props) {
   const {
-    quickExpenses, friends,
+    quickExpenses,
     selectedDate, selectedTime, selectedPaidBy, selectedPaidFor,
-    reloadExpenses
+    selectedCategoryId, reloadExpenses
   } = useApp();
 
   const [toast, setToast] = useState<string | null>(null);
@@ -38,6 +35,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
       amount: qe.amount,
       paidBy: selectedPaidBy,
       paidFor: selectedPaidFor,
+      categoryId: selectedCategoryId || 'other',
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -95,14 +93,8 @@ export default function QuickExpenseButtons({ onManage }: Props) {
               variant="outlined"
               size="medium"
               sx={{
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                '&:hover': {
-                  backgroundColor: 'primary.main',
-                  color: 'white',
-                  borderColor: 'primary.main'
-                },
+                fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
+                '&:hover': { backgroundColor: 'primary.main', color: 'white', borderColor: 'primary.main' },
                 '&:active': { transform: 'scale(0.96)' }
               }}
             />
@@ -115,12 +107,8 @@ export default function QuickExpenseButtons({ onManage }: Props) {
         anchorEl={menuAnchor}
         onClose={() => { setMenuAnchor(null); setMenuItem(null); }}
       >
-        <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>
-          Edit
-        </MenuItem>
-        <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>
-          Delete
-        </MenuItem>
+        <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>Edit</MenuItem>
+        <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>Delete</MenuItem>
       </Menu>
 
       <Snackbar

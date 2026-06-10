@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Box, TextField, Button, InputAdornment, Snackbar, Alert
-} from '@mui/material';
+import { Box, TextField, Button, InputAdornment, Snackbar, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useApp } from '../../hooks/useApp';
 import * as db from '../../db';
@@ -11,7 +9,7 @@ import type { Expense } from '../../types';
 export default function ManualExpenseForm() {
   const {
     selectedDate, selectedTime, selectedPaidBy, selectedPaidFor,
-    settings, reloadExpenses
+    selectedCategoryId, settings, reloadExpenses
   } = useApp();
 
   const [name, setName] = useState('');
@@ -33,6 +31,7 @@ export default function ManualExpenseForm() {
       amount: amt,
       paidBy: selectedPaidBy,
       paidFor: selectedPaidFor,
+      categoryId: selectedCategoryId || 'other',
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -72,9 +71,7 @@ export default function ManualExpenseForm() {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <span style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.9rem' }}>
-                  ₹
-                </span>
+                <span style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.9rem' }}>₹</span>
               </InputAdornment>
             )
           }}
@@ -94,7 +91,6 @@ export default function ManualExpenseForm() {
           <span style={{ fontSize: '0.75rem', color: '#E53935' }}>{error}</span>
         </Box>
       )}
-
       <Snackbar
         open={Boolean(toast)}
         autoHideDuration={2000}

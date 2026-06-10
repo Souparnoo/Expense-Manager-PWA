@@ -43,60 +43,75 @@ export function getMonthEnd(month?: string): string {
   return dayjs(m).endOf('month').format('YYYY-MM-DD');
 }
 
-// Dashboard: expense ON ME (Me→Me or Friend→Me)
 export function isExpenseOnMe(expense: Expense): boolean {
   return expense.paidFor === 'me';
 }
 
-// Calculate personal expense total for a set of expenses
 export function calcPersonalTotal(expenses: Expense[]): number {
   return expenses.filter(isExpenseOnMe).reduce((sum, e) => sum + e.amount, 0);
 }
 
-// Calculate friend balances from expenses and settlements
+/**
+ * NET SIGN CONVENTION
+ * -------------------
+ * net > 0  →  I owe friend      (display: "You owe X ₹N")
+ * net < 0  →  Friend owes me    (display: "X owes you ₹N")
+ * net = 0  →  Settled
+ *
+ * EXPENSE MATH (rawNet)
+ * ---------------------
+ * friend paid for me  → I owe friend more  → rawNet += amount   (net goes positive)
+ * I paid for friend   → friend owes me     → rawNet -= amount   (net goes negative)
+ *
+ *   rawNet = iOweFriend - friendOwesMe
+ *   e.g. I paid ₹45 for Umalulu → rawNet = 0 - 45 = -45  ✓ (Umalulu owes me)
+ *
+ * SETTLEMENT STORAGE (handleSettle in SettlementPage)
+ * ----------------------------------------------------
+ * "friend paid me ₹N"  → stored as  s.amount = +N
+ * "I paid friend ₹N"   → stored as  s.amount = -N
+ *
+ * SETTLEMENT EFFECT ON NET
+ * ------------------------
+ * "friend paid me ₹45" (s.amount=+45):
+ *   net was -45 (friend owes me), after settlement → 0
+ *   net = rawNet + s.amount = -45 + 45 = 0  ✓
+ *
+ * "I paid friend ₹45" (s.amount=-45):
+ *   net was +45 (I owe friend), after settlement → 0
+ *   net = rawNet + s.amount = +45 + (-45) = 0  ✓
+ *
+ * FINAL FORMULA:  net = rawNet + sum(s.amount)
+ */
 export function calcFriendBalances(
   expenses: Expense[],
   settlements: Settlement[],
   friends: Friend[]
 ): FriendBalance[] {
   return friends.map(friend => {
-    // Transactions involving this friend
-    const friendExpenses = expenses.filter(
-      e => e.paidBy === friend.id || e.paidFor === friend.id
-    );
+    let iOweFriend = 0;
+    let friendOwesMe = 0;
 
-    let iOweFriend = 0;    // friend paid for me
-    let friendOwesMe = 0;  // I paid for friend
-
-    for (const e of friendExpenses) {
+    for (const e of expenses) {
       if (e.paidBy === friend.id && e.paidFor === 'me') {
-        // Friend paid for me → I owe friend
         iOweFriend += e.amount;
       } else if (e.paidBy === 'me' && e.paidFor === friend.id) {
-        // I paid for friend → friend owes me
         friendOwesMe += e.amount;
       }
     }
 
-    // Apply settlements
-    const friendSettlements = settlements.filter(s => s.friendId === friend.id);
-    let settlementNet = 0;
-    for (const s of friendSettlements) {
-      // positive amount = friend paid me (reduces what I owe or increases what friend owes)
-      // negative amount = I paid friend (reduces what friend owes or increases what I owe)
-      settlementNet += s.amount;
-    }
-
-    // net > 0: I owe friend, net < 0: friend owes me
+    // rawNet < 0 = friend owes me, rawNet > 0 = I owe friend
     const rawNet = iOweFriend - friendOwesMe;
-    const net = rawNet + settlementNet;
 
-    return {
-      friend,
-      iOweFriend,
-      friendOwesMe,
-      net
-    };
+    // Each settlement.amount: +N = friend paid me (shrinks negative rawNet toward 0)
+    //                          -N = I paid friend  (shrinks positive rawNet toward 0)
+    const settlementTotal = settlements
+      .filter(s => s.friendId === friend.id)
+      .reduce((sum, s) => sum + s.amount, 0);
+
+    const net = rawNet + settlementTotal;
+
+    return { friend, iOweFriend, friendOwesMe, net };
   });
 }
 

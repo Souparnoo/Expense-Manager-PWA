@@ -4,7 +4,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 export default defineConfig({
-  base: '/Expense-Manager-PWA/',
   plugins: [
     react(),
     VitePWA({
@@ -18,8 +17,8 @@ export default defineConfig({
         background_color: '#0A0E1A',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/Expense-Manager-PWA/',
-        start_url: '/Expense-Manager-PWA/',
+        scope: '/',
+        start_url: '/',
         icons: [
           {
             src: 'pwa-192x192.png',

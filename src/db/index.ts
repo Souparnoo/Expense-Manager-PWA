@@ -1,8 +1,9 @@
 import { openDB, IDBPDatabase } from 'idb';
-import type { Friend, QuickExpense, Expense, Settlement, Budget, AppSettings } from '../types';
+import type { Friend, QuickExpense, Expense, Settlement, Budget, AppSettings, Category } from '../types';
+import { DEFAULT_CATEGORIES } from '../types';
 
 const DB_NAME = 'expense-manager-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // bumped for categories store
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -10,53 +11,60 @@ export async function getDB(): Promise<IDBPDatabase> {
   if (dbInstance) return dbInstance;
 
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Friends store
+    upgrade(db, oldVersion) {
+      // ── v1 stores (create if missing) ──────────────────────────────────────
       if (!db.objectStoreNames.contains('friends')) {
-        const friendsStore = db.createObjectStore('friends', { keyPath: 'id' });
-        friendsStore.createIndex('active', 'active');
-        friendsStore.createIndex('name', 'name');
+        const s = db.createObjectStore('friends', { keyPath: 'id' });
+        s.createIndex('active', 'active');
+        s.createIndex('name', 'name');
       }
-
-      // Quick Expenses store
       if (!db.objectStoreNames.contains('quickExpenses')) {
         db.createObjectStore('quickExpenses', { keyPath: 'id' });
       }
-
-      // Expenses store
       if (!db.objectStoreNames.contains('expenses')) {
-        const expenseStore = db.createObjectStore('expenses', { keyPath: 'id' });
-        expenseStore.createIndex('date', 'date');
-        expenseStore.createIndex('timestamp', 'timestamp');
-        expenseStore.createIndex('paidBy', 'paidBy');
-        expenseStore.createIndex('paidFor', 'paidFor');
+        const s = db.createObjectStore('expenses', { keyPath: 'id' });
+        s.createIndex('date', 'date');
+        s.createIndex('timestamp', 'timestamp');
+        s.createIndex('paidBy', 'paidBy');
+        s.createIndex('paidFor', 'paidFor');
       }
-
-      // Settlements store
       if (!db.objectStoreNames.contains('settlements')) {
-        const settlementStore = db.createObjectStore('settlements', { keyPath: 'id' });
-        settlementStore.createIndex('friendId', 'friendId');
-        settlementStore.createIndex('date', 'date');
-        settlementStore.createIndex('timestamp', 'timestamp');
+        const s = db.createObjectStore('settlements', { keyPath: 'id' });
+        s.createIndex('friendId', 'friendId');
+        s.createIndex('date', 'date');
+        s.createIndex('timestamp', 'timestamp');
       }
-
-      // Budgets store
       if (!db.objectStoreNames.contains('budgets')) {
-        const budgetStore = db.createObjectStore('budgets', { keyPath: 'id' });
-        budgetStore.createIndex('month', 'month', { unique: true });
+        const s = db.createObjectStore('budgets', { keyPath: 'id' });
+        s.createIndex('month', 'month', { unique: true });
       }
-
-      // Settings store
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'id' });
       }
-    }
+
+      // ── v2: categories store ────────────────────────────────────────────────
+      if (!db.objectStoreNames.contains('categories')) {
+        db.createObjectStore('categories', { keyPath: 'id' });
+      }
+    },
+    async blocked() {},
+    async blocking() { dbInstance = null; }
   });
+
+  // Seed default categories if store is empty
+  const existing = await dbInstance.getAll('categories');
+  if (existing.length === 0) {
+    const tx = dbInstance.transaction('categories', 'readwrite');
+    for (const cat of DEFAULT_CATEGORIES) {
+      await tx.store.put(cat);
+    }
+    await tx.done;
+  }
 
   return dbInstance;
 }
 
-// ─── Friends ────────────────────────────────────────────────────────────────
+// ─── Friends ─────────────────────────────────────────────────────────────────
 
 export async function getAllFriends(): Promise<Friend[]> {
   const db = await getDB();
@@ -64,8 +72,7 @@ export async function getAllFriends(): Promise<Friend[]> {
 }
 
 export async function getActiveFriends(): Promise<Friend[]> {
-  const friends = await getAllFriends();
-  return friends.filter(f => f.active);
+  return (await getAllFriends()).filter(f => f.active);
 }
 
 export async function getFriend(id: string): Promise<Friend | undefined> {
@@ -83,7 +90,25 @@ export async function deleteFriend(id: string): Promise<void> {
   await db.delete('friends', id);
 }
 
-// ─── Quick Expenses ──────────────────────────────────────────────────────────
+// ─── Categories ──────────────────────────────────────────────────────────────
+
+export async function getAllCategories(): Promise<Category[]> {
+  const db = await getDB();
+  const all = await db.getAll('categories');
+  return all.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function saveCategory(cat: Category): Promise<void> {
+  const db = await getDB();
+  await db.put('categories', cat);
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('categories', id);
+}
+
+// ─── Quick Expenses ───────────────────────────────────────────────────────────
 
 export async function getAllQuickExpenses(): Promise<QuickExpense[]> {
   const db = await getDB();
@@ -101,7 +126,7 @@ export async function deleteQuickExpense(id: string): Promise<void> {
   await db.delete('quickExpenses', id);
 }
 
-// ─── Expenses ────────────────────────────────────────────────────────────────
+// ─── Expenses ─────────────────────────────────────────────────────────────────
 
 export async function getAllExpenses(): Promise<Expense[]> {
   const db = await getDB();
@@ -131,11 +156,10 @@ export async function getExpensesByDate(date: string): Promise<Expense[]> {
 }
 
 export async function getExpensesByDateRange(startDate: string, endDate: string): Promise<Expense[]> {
-  const expenses = await getAllExpenses();
-  return expenses.filter(e => e.date >= startDate && e.date <= endDate);
+  return (await getAllExpenses()).filter(e => e.date >= startDate && e.date <= endDate);
 }
 
-// ─── Settlements ─────────────────────────────────────────────────────────────
+// ─── Settlements ──────────────────────────────────────────────────────────────
 
 export async function getAllSettlements(): Promise<Settlement[]> {
   const db = await getDB();
@@ -159,12 +183,11 @@ export async function deleteSettlement(id: string): Promise<void> {
   await db.delete('settlements', id);
 }
 
-// ─── Budget ──────────────────────────────────────────────────────────────────
+// ─── Budget ───────────────────────────────────────────────────────────────────
 
 export async function getBudgetForMonth(month: string): Promise<Budget | undefined> {
   const db = await getDB();
-  const all = await db.getAllFromIndex('budgets', 'month', month);
-  return all[0];
+  return (await db.getAllFromIndex('budgets', 'month', month))[0];
 }
 
 export async function getAllBudgets(): Promise<Budget[]> {
@@ -177,7 +200,7 @@ export async function saveBudget(budget: Budget): Promise<void> {
   await db.put('budgets', budget);
 }
 
-// ─── Settings ────────────────────────────────────────────────────────────────
+// ─── Settings ─────────────────────────────────────────────────────────────────
 
 export async function getSettings(): Promise<AppSettings | undefined> {
   const db = await getDB();
@@ -189,46 +212,49 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   await db.put('settings', settings);
 }
 
-// ─── Backup / Restore ────────────────────────────────────────────────────────
+// ─── Backup / Restore ─────────────────────────────────────────────────────────
 
 export async function exportAllData() {
-  const [friends, quickExpenses, expenses, settlements, budgets] = await Promise.all([
+  const [friends, quickExpenses, expenses, settlements, budgets, categories] = await Promise.all([
     getAllFriends(),
     getAllQuickExpenses(),
     getAllExpenses(),
     getAllSettlements(),
-    getAllBudgets()
+    getAllBudgets(),
+    getAllCategories(),
   ]);
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     friends,
     quickExpenses,
     expenses,
     settlements,
-    budgets
+    budgets,
+    categories,
   };
 }
 
-export async function importAllData(data: ReturnType<typeof exportAllData> extends Promise<infer T> ? T : never): Promise<void> {
+export async function importAllData(data: any): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['friends', 'quickExpenses', 'expenses', 'settlements', 'budgets'], 'readwrite');
+  const stores = ['friends', 'quickExpenses', 'expenses', 'settlements', 'budgets', 'categories'] as const;
+  const tx = db.transaction([...stores], 'readwrite');
 
-  // Clear all stores
-  await Promise.all([
-    tx.objectStore('friends').clear(),
-    tx.objectStore('quickExpenses').clear(),
-    tx.objectStore('expenses').clear(),
-    tx.objectStore('settlements').clear(),
-    tx.objectStore('budgets').clear()
-  ]);
+  for (const s of stores) await tx.objectStore(s).clear();
 
-  // Import all
-  for (const f of data.friends) await tx.objectStore('friends').put(f);
-  for (const qe of data.quickExpenses) await tx.objectStore('quickExpenses').put(qe);
-  for (const e of data.expenses) await tx.objectStore('expenses').put(e);
-  for (const s of data.settlements) await tx.objectStore('settlements').put(s);
-  for (const b of data.budgets) await tx.objectStore('budgets').put(b);
+  for (const f of data.friends ?? [])       await tx.objectStore('friends').put(f);
+  for (const qe of data.quickExpenses ?? []) await tx.objectStore('quickExpenses').put(qe);
+  for (const e of data.expenses ?? [])       await tx.objectStore('expenses').put(e);
+  for (const s of data.settlements ?? [])    await tx.objectStore('settlements').put(s);
+  for (const b of data.budgets ?? [])        await tx.objectStore('budgets').put(b);
+
+  // Restore categories; if none in backup, re-seed defaults
+  const cats = data.categories ?? [];
+  if (cats.length > 0) {
+    for (const c of cats) await tx.objectStore('categories').put(c);
+  } else {
+    for (const c of DEFAULT_CATEGORIES) await tx.objectStore('categories').put(c);
+  }
 
   await tx.done;
 }

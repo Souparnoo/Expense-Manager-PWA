@@ -1,21 +1,28 @@
 import React, { useState } from 'react';
 import {
   Box, Card, CardContent, Typography, Switch, FormControlLabel,
-  Button, Divider, List, ListItem, ListItemText, Alert,
-  Snackbar, CircularProgress
+  Button, List, ListItem, ListItemText, Alert, Snackbar, CircularProgress,
+  ListItemButton, ListItemIcon
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import InfoIcon from '@mui/icons-material/Info';
+import CategoryIcon from '@mui/icons-material/Category';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useApp } from '../hooks/useApp';
 import * as db from '../db';
 import { exportToExcel } from '../utils/excel';
 import PageHeader from '../components/common/PageHeader';
+import DriveBackupCard from '../components/settings/DriveBackupCard';
 
-export default function SettingsPage() {
-  const { settings, updateSettings, expenses, friends, settlements, reloadAll } = useApp();
+interface Props {
+  onNavigateCategories: () => void;
+}
+
+export default function SettingsPage({ onNavigateCategories }: Props) {
+  const { settings, updateSettings, expenses, friends, settlements, categories, reloadAll } = useApp();
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -30,9 +37,9 @@ export default function SettingsPage() {
       a.download = `expense-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ msg: 'Backup exported successfully!', type: 'success' });
+      setToast({ msg: 'Backup exported!', type: 'success' });
     } catch {
-      setToast({ msg: 'Export failed. Try again.', type: 'error' });
+      setToast({ msg: 'Export failed.', type: 'error' });
     }
     setLoading(false);
   };
@@ -48,11 +55,11 @@ export default function SettingsPage() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!data.expenses || !data.friends) throw new Error('Invalid backup file');
+        if (!data.expenses && !data.friends) throw new Error('Invalid backup file');
         await db.importAllData(data);
         await reloadAll();
         setToast({ msg: 'Data restored successfully!', type: 'success' });
-      } catch (err) {
+      } catch {
         setToast({ msg: 'Import failed. Invalid backup file.', type: 'error' });
       }
       setLoading(false);
@@ -63,7 +70,7 @@ export default function SettingsPage() {
   const handleExportExcel = () => {
     try {
       exportToExcel(expenses, friends, settlements);
-      setToast({ msg: 'Excel exported successfully!', type: 'success' });
+      setToast({ msg: 'Excel exported!', type: 'success' });
     } catch {
       setToast({ msg: 'Excel export failed.', type: 'error' });
     }
@@ -74,6 +81,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
 
       <Box sx={{ flex: 1, overflowY: 'auto', pb: 10, px: 2 }}>
+
         {/* Appearance */}
         <Card sx={{ mb: 2 }}>
           <CardContent>
@@ -83,23 +91,39 @@ export default function SettingsPage() {
             </Box>
             <FormControlLabel
               control={
-                <Switch
-                  checked={settings.darkMode}
-                  onChange={e => updateSettings({ darkMode: e.target.checked })}
-                  color="primary"
-                />
+                <Switch checked={settings.darkMode}
+                  onChange={e => updateSettings({ darkMode: e.target.checked })} color="primary" />
               }
               label="Dark Mode"
             />
           </CardContent>
         </Card>
 
-        {/* Backup */}
+        {/* Categories shortcut */}
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+            <ListItemButton onClick={onNavigateCategories} sx={{ borderRadius: 2, px: 2, py: 1.5 }}>
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <CategoryIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText
+                primary={<Typography fontWeight={700}>Manage Categories</Typography>}
+                secondary={`${categories.length} categories`}
+              />
+              <ChevronRightIcon sx={{ opacity: 0.4 }} />
+            </ListItemButton>
+          </CardContent>
+        </Card>
+
+        {/* Google Drive Backup */}
+        <DriveBackupCard />
+
+        {/* Local Backup */}
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
               <DownloadIcon fontSize="small" color="primary" />
-              <Typography fontWeight={700}>Backup & Restore</Typography>
+              <Typography fontWeight={700}>Local Backup</Typography>
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <Button
@@ -111,13 +135,7 @@ export default function SettingsPage() {
               >
                 Export JSON Backup
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<UploadIcon />}
-                onClick={handleImportJSON}
-                disabled={loading}
-                fullWidth
-              >
+              <Button variant="outlined" startIcon={<UploadIcon />} onClick={handleImportJSON} disabled={loading} fullWidth>
                 Import JSON Backup
               </Button>
               <Alert severity="warning" sx={{ borderRadius: 2 }}>
@@ -134,13 +152,8 @@ export default function SettingsPage() {
               <TableChartIcon fontSize="small" color="primary" />
               <Typography fontWeight={700}>Excel Export</Typography>
             </Box>
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<TableChartIcon />}
-              onClick={handleExportExcel}
-              fullWidth
-            >
+            <Button variant="contained" color="success" startIcon={<TableChartIcon />}
+              onClick={handleExportExcel} fullWidth>
               Export to Excel (.xlsx)
             </Button>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
@@ -157,55 +170,29 @@ export default function SettingsPage() {
               <Typography fontWeight={700}>About</Typography>
             </Box>
             <List disablePadding dense>
-              <ListItem disablePadding sx={{ py: 0.25 }}>
-                <ListItemText
-                  primary="App"
-                  secondary="Expense Manager"
-                  primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                  secondaryTypographyProps={{ fontWeight: 600 }}
-                />
-              </ListItem>
-              <ListItem disablePadding sx={{ py: 0.25 }}>
-                <ListItemText
-                  primary="Version"
-                  secondary="1.0.0"
-                  primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                  secondaryTypographyProps={{ fontWeight: 600 }}
-                />
-              </ListItem>
-              <ListItem disablePadding sx={{ py: 0.25 }}>
-                <ListItemText
-                  primary="Storage"
-                  secondary="IndexedDB (fully offline)"
-                  primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                  secondaryTypographyProps={{ fontWeight: 600 }}
-                />
-              </ListItem>
-              <ListItem disablePadding sx={{ py: 0.25 }}>
-                <ListItemText
-                  primary="Records"
-                  secondary={`${expenses.length} expenses · ${friends.length} friends`}
-                  primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                  secondaryTypographyProps={{ fontWeight: 600 }}
-                />
-              </ListItem>
+              {[
+                ['App', 'Expense Manager'],
+                ['Version', '2.0.0'],
+                ['Storage', 'IndexedDB (fully offline)'],
+                ['Records', `${expenses.length} expenses · ${friends.length} friends · ${categories.length} categories`],
+              ].map(([label, value]) => (
+                <ListItem key={label} disablePadding sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={label}
+                    secondary={value}
+                    primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+                    secondaryTypographyProps={{ fontWeight: 600 }}
+                  />
+                </ListItem>
+              ))}
             </List>
           </CardContent>
         </Card>
       </Box>
 
-      <Snackbar
-        open={Boolean(toast)}
-        autoHideDuration={3000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast?.type || 'success'}
-          variant="filled"
-          onClose={() => setToast(null)}
-          sx={{ borderRadius: 3 }}
-        >
+      <Snackbar open={Boolean(toast)} autoHideDuration={3000} onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={toast?.type || 'success'} variant="filled" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>
           {toast?.msg}
         </Alert>
       </Snackbar>

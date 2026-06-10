@@ -5,6 +5,15 @@ export interface Friend {
   createdAt: number;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;   // emoji
+  color: string;  // hex
+  createdAt: number;
+  isDefault?: boolean;
+}
+
 export interface QuickExpense {
   id: string;
   name: string;
@@ -12,44 +21,54 @@ export interface QuickExpense {
   createdAt: number;
 }
 
-export type PaidBy = 'me' | string; // 'me' or friend id
-export type PaidFor = 'me' | string; // 'me' or friend id
+export type PaidBy = 'me' | string;
+export type PaidFor = 'me' | string;
 
 export interface Expense {
   id: string;
-  date: string;        // YYYY-MM-DD
-  time: string;        // HH:mm
-  timestamp: number;   // epoch ms
+  date: string;
+  time: string;
+  timestamp: number;
   name: string;
   amount: number;
-  paidBy: PaidBy;      // 'me' or friend id
-  paidFor: PaidFor;    // 'me' or friend id
+  paidBy: PaidBy;
+  paidFor: PaidFor;
+  categoryId: string;   // NEW — defaults to 'other'
   createdAt: number;
   updatedAt: number;
 }
 
 export interface Settlement {
   id: string;
-  date: string;        // YYYY-MM-DD
-  time: string;        // HH:mm
+  date: string;
+  time: string;
   timestamp: number;
   friendId: string;
-  amount: number;      // positive = friend paid me, negative = I paid friend
+  amount: number;
   note: string;
   createdAt: number;
 }
 
 export interface Budget {
   id: string;
-  month: string;       // YYYY-MM
+  month: string;
   amount: number;
   updatedAt: number;
+}
+
+export interface DriveBackupMeta {
+  connectedAt: number;
+  lastBackupAt: number | null;
+  lastBackupFileName: string | null;
+  lastBackupSize: number | null;
+  encryptionEnabled: boolean;
 }
 
 export interface AppSettings {
   id: string;
   darkMode: boolean;
   currency: string;
+  driveBackup?: DriveBackupMeta;
   updatedAt: number;
 }
 
@@ -60,13 +79,14 @@ export interface DBSchema {
   settlements: Settlement;
   budgets: Budget;
   settings: AppSettings;
+  categories: Category;
 }
 
 export interface FriendBalance {
   friend: Friend;
-  iOweFriend: number;   // sum of friend paid for me
-  friendOwesMe: number; // sum of I paid for friend
-  net: number;          // positive = I owe friend, negative = friend owes me
+  iOweFriend: number;
+  friendOwesMe: number;
+  net: number;
 }
 
 export interface DashboardStats {
@@ -84,4 +104,18 @@ export interface ExpenseFormData {
   amount: string;
   paidBy: string;
   paidFor: string;
+  categoryId: string;
 }
+
+// Default categories seeded on first run
+export const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'food',          name: 'Food',          icon: '🍔', color: '#E53935', createdAt: 0, isDefault: true },
+  { id: 'transport',     name: 'Transport',     icon: '🚌', color: '#1E88E5', createdAt: 0, isDefault: true },
+  { id: 'shopping',      name: 'Shopping',      icon: '🛍️', color: '#8E24AA', createdAt: 0, isDefault: true },
+  { id: 'rent',          name: 'Rent',          icon: '🏠', color: '#00897B', createdAt: 0, isDefault: true },
+  { id: 'medical',       name: 'Medical',       icon: '💊', color: '#F4511E', createdAt: 0, isDefault: true },
+  { id: 'education',     name: 'Education',     icon: '📚', color: '#F9A825', createdAt: 0, isDefault: true },
+  { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: '#3949AB', createdAt: 0, isDefault: true },
+  { id: 'bills',         name: 'Bills',         icon: '💡', color: '#039BE5', createdAt: 0, isDefault: true },
+  { id: 'other',         name: 'Other',         icon: '📦', color: '#757575', createdAt: 0, isDefault: true },
+];

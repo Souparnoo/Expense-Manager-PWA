@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Friend, QuickExpense, Expense, Settlement, Budget, AppSettings } from '../types';
+import type { Friend, QuickExpense, Expense, Settlement, Budget, AppSettings, Category } from '../types';
 import * as db from '../db';
-import { getTodayDate, getCurrentTime, getCurrentMonth } from '../utils';
+import { getTodayDate, getCurrentTime } from '../utils';
 
 interface AppContextType {
   // Data
@@ -11,6 +11,7 @@ interface AppContextType {
   settlements: Settlement[];
   budgets: Budget[];
   settings: AppSettings;
+  categories: Category[];
 
   // Loading
   loading: boolean;
@@ -21,20 +22,23 @@ interface AppContextType {
   reloadExpenses: () => Promise<void>;
   reloadSettlements: () => Promise<void>;
   reloadBudgets: () => Promise<void>;
+  reloadCategories: () => Promise<void>;
   reloadAll: () => Promise<void>;
 
   // Settings
   updateSettings: (s: Partial<AppSettings>) => Promise<void>;
 
-  // Form state (shared across home)
+  // Form state
   selectedDate: string;
   selectedTime: string;
   selectedPaidBy: string;
   selectedPaidFor: string;
+  selectedCategoryId: string;
   setSelectedDate: (d: string) => void;
   setSelectedTime: (t: string) => void;
   setSelectedPaidBy: (v: string) => void;
   setSelectedPaidFor: (v: string) => void;
+  setSelectedCategoryId: (v: string) => void;
 }
 
 const defaultSettings: AppSettings = {
@@ -53,6 +57,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form state
@@ -60,6 +65,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedTime, setSelectedTime] = useState(getCurrentTime());
   const [selectedPaidBy, setSelectedPaidBy] = useState('me');
   const [selectedPaidFor, setSelectedPaidFor] = useState('me');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('other');
 
   const reloadFriends = useCallback(async () => {
     setFriends(await db.getAllFriends());
@@ -81,6 +87,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBudgets(await db.getAllBudgets());
   }, []);
 
+  const reloadCategories = useCallback(async () => {
+    setCategories(await db.getAllCategories());
+  }, []);
+
   const reloadAll = useCallback(async () => {
     setLoading(true);
     await Promise.all([
@@ -88,10 +98,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reloadQuickExpenses(),
       reloadExpenses(),
       reloadSettlements(),
-      reloadBudgets()
+      reloadBudgets(),
+      reloadCategories(),
     ]);
     setLoading(false);
-  }, [reloadFriends, reloadQuickExpenses, reloadExpenses, reloadSettlements, reloadBudgets]);
+  }, [reloadFriends, reloadQuickExpenses, reloadExpenses, reloadSettlements, reloadBudgets, reloadCategories]);
 
   const updateSettings = useCallback(async (partial: Partial<AppSettings>) => {
     const updated: AppSettings = { ...settings, ...partial, updatedAt: Date.now() };
@@ -110,7 +121,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     init();
   }, []);
 
-  // Reset time every minute
   useEffect(() => {
     const interval = setInterval(() => {
       setSelectedTime(getCurrentTime());
@@ -120,12 +130,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      friends, quickExpenses, expenses, settlements, budgets, settings,
+      friends, quickExpenses, expenses, settlements, budgets, settings, categories,
       loading,
-      reloadFriends, reloadQuickExpenses, reloadExpenses, reloadSettlements, reloadBudgets, reloadAll,
+      reloadFriends, reloadQuickExpenses, reloadExpenses, reloadSettlements,
+      reloadBudgets, reloadCategories, reloadAll,
       updateSettings,
-      selectedDate, selectedTime, selectedPaidBy, selectedPaidFor,
-      setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor
+      selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedCategoryId,
+      setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedCategoryId
     }}>
       {children}
     </AppContext.Provider>
