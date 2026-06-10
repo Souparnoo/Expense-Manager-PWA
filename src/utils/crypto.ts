@@ -16,7 +16,9 @@ export interface EncryptedPayload {
 }
 
 function bufToHex(buf: ArrayBuffer | ArrayBufferView): string {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  const bytes = buf instanceof Uint8Array 
+    ? buf 
+    : new Uint8Array(buf as ArrayBuffer);
   return Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
@@ -36,7 +38,12 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
     'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { 
+      name: 'PBKDF2', 
+      salt: salt as BufferSource,
+      iterations: PBKDF2_ITERATIONS, 
+      hash: 'SHA-256' 
+    },
     keyMaterial,
     { name: 'AES-GCM', length: KEY_LENGTH },
     false,
@@ -71,9 +78,9 @@ export async function decryptData(payload: EncryptedPayload, password: string): 
   const key        = await deriveKey(password, salt);
 
   const plainBuf = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as BufferSource },
     key,
-    ciphertext
+    ciphertext as BufferSource
   );
 
   return new TextDecoder().decode(plainBuf);
