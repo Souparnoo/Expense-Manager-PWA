@@ -1,438 +1,329 @@
-# Expense Manager PWA
+# 💰 Expense Manager PWA
 
-A privacy-first, offline-capable expense and friend-settlement tracker built with React, TypeScript, IndexedDB, and Material UI.
+A fully offline-capable, installable Personal Expense Manager built as a Progressive Web App. Track daily spending, manage friend settlements, analyse your habits with charts, and back up everything to Google Drive — all without a backend, server, or account.
 
-🌐 Live Demo: https://souparnoo.github.io/Expense-Manager-PWA/
-
----
-
-## Overview
-
-Expense Manager PWA is a Progressive Web Application (PWA) designed to help users track personal expenses, manage shared expenses with friends, monitor budgets, and analyze spending habits.
-
-Unlike traditional expense trackers, all data is stored locally on the user's device using IndexedDB. No account, internet connection, or cloud storage is required.
-
-The application can be installed on Android, Windows, Linux, and macOS directly from the browser.
+> **Live on:** [souparnoo.github.io/Expense-Manager-PWA](https://souparnoo.github.io/Expense-Manager-PWA/)
 
 ---
 
-## Key Features
+## 📦 Tech Stack
 
-### Personal Expense Tracking
-
-Track daily expenses with:
-
-* Expense name
-* Amount
-* Date
-* Time
-
-Examples:
-
-* Tea
-* Lunch
-* Transport
-* Shopping
-* Bills
-
-Expenses can be recorded instantly and are permanently stored locally.
+| Layer | Technology |
+|-------|-----------|
+| UI Framework | React 18 + TypeScript |
+| Build Tool | Vite 5 |
+| Component Library | Material UI v5 (MUI) |
+| Local Storage | IndexedDB via `idb` v8 |
+| Charts | Recharts v2 |
+| Excel Export | SheetJS (`xlsx`) |
+| Date Handling | Day.js |
+| PWA | `vite-plugin-pwa` + Workbox |
+| Encryption | Web Crypto API (AES-256-GCM + PBKDF2) |
 
 ---
 
-### Quick Expense Buttons
+## 📲 Installing as a Native App
 
-Frequently used expenses can be saved as reusable quick actions.
+This is a PWA — it installs directly from the browser with no app store required.
 
-Examples:
+| Platform | How to Install |
+|----------|---------------|
+| **Android** | Open in Chrome → three-dot menu → *Add to Home Screen* |
+| **iPhone / iPad** | Open in Safari → Share button → *Add to Home Screen* |
+| **Windows** | Open in Chrome/Edge → address bar install icon → *Install* |
+| **macOS / Linux** | Open in Chrome → address bar install icon → *Install* |
 
-* Tea ₹10
-* Breakfast ₹40
-* Bus ₹20
-
-One click instantly records the expense using the currently selected date, time, and payment information.
-
-Benefits:
-
-* Faster entry
-* Reduced repetitive typing
-* Better daily usability
+Once installed it runs in full-screen standalone mode, works completely offline, and receives updates automatically when you're connected.
 
 ---
 
-### Manual Date and Time Selection
+## ✨ Features Overview
 
-Expenses are not restricted to the current date.
+### Core Expense Tracking
+- Record expenses with **Date, Time, Paid By, Paid For** selectors
+- **Quick Expense buttons** — one-tap recording for frequent items (Tea, Bus, Lunch, etc.)
+- **Manual entry** with name and amount
+- **Transaction rules** enforced automatically:
+  - `Me → Me` : personal expense
+  - `Me → Friend` : I paid for friend (friend owes me)
+  - `Friend → Me` : friend paid for me (I owe friend)
+  - `Friend → Friend` : blocked — not allowed
 
-Users can:
-
-* Select any date
-* Select any time
-* Add expenses retroactively
-
-This is useful when an expense was forgotten and needs to be added later.
-
-All history and analytics update automatically after insertion.
-
----
+### Dashboard
+- Today's total spend and transaction count
+- Monthly total spend and transaction count
+- **Monthly Budget** with progress bar and over-budget warnings
 
 ### Friend Settlement System
+- Track who paid for whom across all transactions
+- Net balance per friend (positive = I owe, negative = friend owes me)
+- Record cash/UPI settlements that adjust balances in real time
+- Full settlement history per friend
 
-The application supports shared expenses between the user and friends.
+### History Pages
+- **Personal History** — grouped by date, expandable per-day detail
+- **Friend History** — date-wise friend transaction log
+- Search, date range filter, and sort (newest / oldest / highest / lowest)
 
-Supported transaction types:
+### Analytics
+- Monthly spending trend (6-month bar chart)
+- Daily spending line chart for the current month
+- Category breakdown pie chart (all time)
+- Monthly category breakdown with relative progress bars
+- Top 5 spending categories
+- Friend settlement summary (horizontal bar chart)
 
-1. Me → Me
-2. Me → Friend
-3. Friend → Me
-
-The application automatically prevents Friend → Friend transactions because they do not involve the user.
-
----
-
-### Smart Balance Calculation
-
-When the user pays for a friend:
-
-Example:
-
-Lunch ₹200
-
-Paid By: Me
-
-Paid For: Rahul
-
-Result:
-
-Rahul owes me ₹200
+### Data Portability
+- **JSON Backup** — export / import all data as a single `.json` file
+- **Excel Export** — full `.xlsx` with separate sheets for All History, My Expenses, and one sheet per friend
+- **Google Drive Backup** — manual cloud backup with optional AES-256-GCM encryption
 
 ---
 
-When a friend pays for the user:
+## 📁 Project Structure
 
-Example:
-
-Tea ₹50
-
-Paid By: Rahul
-
-Paid For: Me
-
-Result:
-
-I owe Rahul ₹50
-
-Balances are calculated automatically.
-
----
-
-### Settlement Tracking
-
-Record settlement payments between friends.
-
-Example:
-
-Rahul pays back ₹500.
-
-The application automatically updates balances while preserving the full transaction history.
-
----
-
-### Friend Management
-
-Manage a list of frequently used friends.
-
-Features:
-
-* Add Friend
-* Edit Friend
-* Deactivate Friend
-* Delete Friend
-
-Historical records remain intact even when friends are removed from active use.
+```
+src/
+├── components/
+│   ├── common/          # ConfirmDialog, EmptyState, PageHeader
+│   ├── dashboard/       # DashboardStats, RecentTransactions
+│   ├── expenses/        # TransactionSelectors, CategorySelector,
+│   │                    # QuickExpenseButtons, ManualExpenseForm
+│   └── settings/        # DriveBackupCard
+├── db/
+│   └── index.ts         # Full IndexedDB abstraction (CRUD + backup/restore)
+├── hooks/
+│   └── useApp.tsx       # Global context — all state, reload functions, form state
+├── pages/
+│   ├── HomePage.tsx
+│   ├── HistoryPage.tsx
+│   ├── FriendHistoryPage.tsx
+│   ├── FriendsPage.tsx
+│   ├── SettlementPage.tsx
+│   ├── CategoriesPage.tsx
+│   ├── AnalyticsPage.tsx
+│   ├── QuickExpensesPage.tsx
+│   └── SettingsPage.tsx
+├── types/
+│   └── index.ts         # All TypeScript interfaces and models
+└── utils/
+    ├── index.ts         # Formatting, date helpers, balance calculations
+    ├── theme.ts         # MUI theme (light + dark)
+    ├── excel.ts         # XLSX export logic
+    ├── crypto.ts        # AES-256-GCM encryption / decryption
+    └── gdrive.ts        # Google Drive OAuth + upload / download
+```
 
 ---
 
-### Daily and Monthly Expense Dashboard
+## 🔒 Data & Privacy
 
-View:
-
-* Today's Expense
-* Monthly Expense
-* Today's Transaction Count
-* Monthly Transaction Count
-
-The dashboard focuses on expenses incurred on the user.
-
-Friend-only expenses are excluded from personal expense calculations.
+- **100% local** — all data lives in your browser's IndexedDB
+- No account, no login, no server, no telemetry
+- Google Drive backup stores files in your own Drive's **appDataFolder** (hidden from Drive UI, accessible only by this app)
+- Encryption keys are derived on-the-fly from your password and **never stored or transmitted**
 
 ---
 
-### Monthly Budget Planning
+## 🔧 Google Drive Backup Setup
 
-Set a monthly budget.
-
-Example:
-
-Budget: ₹5000
-
-The application displays:
-
-* Total Spent
-* Remaining Budget
-* Budget Progress
-
-Helping users monitor spending habits throughout the month.
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Enable the **Google Drive API**
+4. Configure the **OAuth consent screen** (External, add your domain)
+5. Create **OAuth 2.0 Credentials** → Web application
+6. Add your domain to *Authorised JavaScript origins*
+   - Development: `http://localhost:5173`
+   - Production: `https://yourdomain.com`
+7. Copy the **Client ID** into your `.env` file as `VITE_GOOGLE_CLIENT_ID`
 
 ---
 
-### Permanent Expense History
-
-All records are permanently stored.
-
-Features:
-
-* No automatic deletion
-* Historical records preserved
-* Date-wise organization
-
-Users can browse previous days and review detailed expense logs.
+## 📋 Changelog
 
 ---
 
-### Personal History Page
+### v2.2.0 — Icon & Theme Overhaul
+*Visual identity update*
 
-Browse expenses grouped by date.
+#### Custom App Icon
+- Replaced the generated placeholder icons with a custom wallet illustration
+- The same icon is used across all PWA install surfaces: Android home screen, iOS Safari, Windows taskbar, macOS Dock, and the in-app header
+- Icon files updated: `pwa-512x512.png`, `pwa-192x192.png`, `apple-touch-icon.png`, `app-icon.png`
+- PWA manifest `theme_color` updated to match
 
-For each date:
+#### Warm Wallet Theme
+The entire colour palette was redesigned to match the icon's visual language:
 
-* Daily total expense
-* Detailed transaction list
+| Role | Old Colour | New Colour | Inspired by |
+|------|-----------|-----------|-------------|
+| Primary | `#1565C0` Blue | `#F57C00` Warm Orange | Wallet body |
+| Secondary | `#00BFA5` Teal | `#2E7D32` Rich Green | Bills / money |
+| Warning | `#FB8C00` Amber | `#F9A825` Gold | Coins + checkmark |
+| Info | — | `#0277BD` Teal-Blue | Wallet strap |
+| Background (dark) | `#0A0E1A` | `#0D0F14` Near-black | Icon dark circle |
 
-Detailed view includes:
+- Card borders now use a subtle amber glow in dark mode
+- FAB shadow colour changed to orange
+- Selected navigation items highlight in orange
+- Dividers use a warm amber tint instead of cold grey
 
-* Time
-* Expense Name
-* Amount
-* Paid By
-* Paid For
-
-Additional features:
-
-* Search
-* Date filtering
-* Sorting
-
----
-
-### Friend History Page
-
-Friend transactions are also stored permanently.
-
-Users can:
-
-* View date-wise summaries
-* Open detailed daily records
-* Search transactions
-* Filter by date range
+#### Analytics Tooltip Fix
+- Recharts tooltip text was rendering in black regardless of dark/light mode
+- Fixed by explicitly setting `contentStyle.color`, `labelStyle`, and `itemStyle` on every chart tooltip using live MUI theme values — tooltips now correctly follow dark/light mode
 
 ---
 
-### Expense Editing
+### v2.1.0 — Category Deletion & Excel Export Improvements
+*Usability and data export refinements*
 
-Modify previously recorded data.
+#### Default Category Deletion
+- Previously, the 9 built-in default categories (Food, Transport, Rent, etc.) could be edited but **not deleted**
+- The restriction has been removed — all categories including defaults now show a delete button
+- Deletion confirmation dialog still shown before any category is removed
+- Expenses that referenced a deleted category gracefully fall back to showing "Other" in all views
 
-Supported:
+#### Category Order on Home Screen
+- The **Category selector** chips were previously shown *above* the Quick Add buttons
+- Moved to appear *below* Quick Add buttons — the logical flow is now:
+  1. Set date / time / paid by / paid for
+  2. Tap a quick expense (or type a manual one)
+  3. Select or confirm the category
+- This matches how most people think: *what did I spend* → *what category is it*
 
-* Edit Expense
-* Edit Friend Transaction
-* Edit Quick Expense
-* Edit Friend Information
-
-All totals and analytics update automatically.
-
----
-
-### Safe Deletion
-
-Users may delete:
-
-* Expenses
-* Friend Transactions
-* Quick Expenses
-
-Deletion confirmation dialogs help prevent accidental data loss.
-
-Historical integrity is preserved.
+#### Excel Export — Category Column
+- All exported sheets now include a **Category** column
+- Added to: `ALL_HISTORY`, `MY_EXPENSES`, and every per-friend sheet
+- Category name is resolved from the stored `categoryId` at export time, with fallback to "Other" if a category was deleted after the transaction was recorded
+- Column position: inserted after Expense Name so the data reads naturally as `Date | Time | Name | Category | Amount`
 
 ---
 
-### Excel Export
+### v2.0.0 — Categories, Google Drive Backup & Encryption
+*Major feature release*
 
-Generate a structured Excel workbook containing all financial data.
+#### Custom Expense Categories
+Every expense now carries a category. This enables filtering, analytics breakdown, and better organisation across the whole app.
 
-Included sheets:
+**9 built-in default categories:**
+| Icon | Name | Colour |
+|------|------|--------|
+| 🍔 | Food | Red |
+| 🚌 | Transport | Blue |
+| 🛍️ | Shopping | Purple |
+| 🏠 | Rent | Teal |
+| 💊 | Medical | Deep Orange |
+| 📚 Education | Education | Amber |
+| 🎬 | Entertainment | Indigo |
+| 💡 | Bills | Sky Blue |
+| 📦 | Other | Grey |
 
-#### ALL_HISTORY
+Users can create unlimited additional categories, each with:
+- A custom **name**
+- An **emoji icon** (picker with 20 presets)
+- A **colour** (picker with 15 presets)
 
-Contains every transaction recorded in the application.
+**Where categories appear:**
+- **Home page** — chip buttons for selecting the active category before recording
+- **Quick Expenses** — each shortcut stores its own default category; the home-page selection overrides it only when explicitly changed
+- **History page** — category icon and name shown per transaction; category filter dropdown added
+- **Analytics page** — category pie chart, monthly category breakdown bar, top-5 category list
+- **Categories page** — dedicated tab; click any category to expand total spent, transaction count, and full transaction history
 
-Columns:
+#### Google Drive Backup
+Manual cloud backup with zero server involvement — all data goes directly to the user's own Google Drive.
 
-* Date
-* Time
-* Expense Name
-* Amount
-* Paid By
-* Paid For
+**How it works:**
+- Uses **Google Identity Services (GIS)** popup OAuth flow
+- Files are stored in Drive's `appDataFolder` scope — hidden from the regular Drive UI, only accessible by this app
+- Backup filename: `expense-manager-backup.json`
+- Existing backup file is overwritten on each backup (no version clutter)
+- One-click **Restore** downloads the file and re-imports all data
 
----
+**What is backed up:** Expenses, Friends, Categories, Quick Expenses, Budgets, Settlements
 
-#### MY_EXPENSES
+**Backup status card shows:**
+- Connection status
+- Last backup date and time
+- Backup file name and size
+- Encryption status
 
-Contains only expenses incurred on the user.
+#### AES-256-GCM Encryption (Optional)
+Before uploading to Google Drive, the backup can be encrypted client-side.
 
-Includes:
+**Technical details:**
+- Algorithm: **AES-256-GCM** (authenticated encryption — detects tampering)
+- Key derivation: **PBKDF2-SHA-256** with 310,000 iterations (NIST 2023 recommendation)
+- Random 32-byte **salt** and 12-byte **IV** generated fresh for every backup
+- Stored payload: `{ version, salt, iv, ciphertext }` — all hex-encoded
+- The **password is never stored** anywhere — not in IndexedDB, not in Drive, not in memory after the operation completes
 
-* Personal expenses
-* Friend-paid expenses
+**Restore flow when encrypted:**
+1. Download encrypted JSON from Drive
+2. Detect `{ version, salt, iv, ciphertext }` structure
+3. Prompt for password
+4. Derive AES key from password + salt using PBKDF2
+5. Decrypt with AES-256-GCM (wrong password throws `OperationError` — shown as user-friendly message)
+6. Parse and restore data
 
-Excludes:
-
-* Expenses paid on behalf of friends
-
----
-
-#### Friend Sheets
-
-A dedicated sheet is created for every friend.
-
-Example:
-
-* Rahul
-* Amit
-* Sourav
-
-Each sheet contains:
-
-* Date
-* Time
-* Expense
-* Transaction Type
-* Paid By
-* Amount
-
-Along with settlement summaries and net balances.
-
----
-
-### Analytics Dashboard
-
-Interactive charts provide spending insights.
-
-Includes:
-
-* Monthly Spending Trend
-* Expense Category Breakdown
-* Friend Settlement Overview
-
-Helping users better understand spending behavior.
+> ⚠️ **Important:** Encrypted backups cannot be recovered without the correct password. There is no reset or recovery mechanism — this is by design.
 
 ---
 
-### Offline First Design
+### v1.0.0 — Initial Release
+*Foundation version*
 
-The application works entirely offline.
+#### Expense Recording
+- Date, Time, Paid By, Paid For selectors with smart locking rules
+- Quick Expense buttons for one-tap recording of frequent items
+- Manual expense entry form
+- Transaction validation: only `Me→Me`, `Me→Friend`, `Friend→Me` allowed
 
-Benefits:
+#### Friend Management
+- Add, edit, deactivate, and delete friends
+- Deactivated friends are excluded from new transactions but preserved in history
 
-* No internet required
-* Faster performance
-* Better privacy
-* No external servers
+#### Friend Settlements
+- Automatic net balance calculation per friend
+- Record cash settlements that adjust balances
+- Full settlement history
 
-All information remains on the user's device.
+#### Dashboard
+- Today's expense and transaction count
+- Monthly expense and transaction count
+- Monthly budget with progress bar and overspend warning
 
----
+#### History
+- Personal history grouped by date (expandable)
+- Friend history grouped by date
+- Search, date range filter, and sort controls
 
-### Backup and Restore
+#### Analytics
+- 6-month spending trend bar chart
+- Daily spending line chart
+- Category breakdown pie chart (using expense names as proxy)
+- Friend settlement horizontal bar chart
 
-Protect your data using:
+#### Data Export
+- **JSON backup** — full export and import
+- **Excel export** — `ALL_HISTORY`, `MY_EXPENSES`, one sheet per friend with net balance summary row
 
-* Export Backup
-* Import Backup
-
-Data can be transferred between devices or restored after reinstalling the application.
-
----
-
-## Technology Stack
-
-Frontend:
-
-* React
-* TypeScript
-* Vite
-* Material UI
-
-Storage:
-
-* IndexedDB
-
-Data Export:
-
-* XLSX
-
-Visualization:
-
-* Recharts
-
-Deployment:
-
-* GitHub Pages
+#### PWA
+- Installable on Android, iOS, Windows, macOS, Linux
+- Full offline support via Workbox service worker
+- Automatic updates when online
 
 ---
 
-## Progressive Web App Features
+## 🐛 Known Bug Fixes
 
-The application can be installed directly from the browser.
-
-Supported Platforms:
-
-* Android
-* Windows
-* Linux
-* macOS
-
-Features:
-
-* Offline access
-* Home screen installation
-* App-like experience
-* Fast loading
+| Version | Bug | Fix |
+|---------|-----|-----|
+| Post 1.0.0 | Settlement direction default was inverted — "Friend owes me" defaulted to "I paid friend" | Fixed default `settleDirection` logic: `net > 0` (I owe) → default to `i_paid_friend`; `net < 0` (friend owes) → default to `friend_paid_me` |
+| Post 1.0.0 | Net balance calculation doubled settlements — `₹45` expense + `₹45` settlement showed `₹90` instead of `₹0` | Fixed formula from `rawNet - settlementTotal` to `rawNet + settlementTotal` in both `utils/index.ts` and `utils/excel.ts` |
+| Post 2.0.0 | Recharts tooltip text showed black text in dark mode | Added `itemStyle` prop to all `<Tooltip>` components with `color: theme.palette.text.primary` |
 
 ---
 
-## Why This Project?
 
-Many expense trackers require:
-
-* Accounts
-* Internet connectivity
-* Cloud synchronization
-* Subscription plans
-
-Expense Manager PWA was built with a different philosophy:
-
-**Your financial data should remain on your device, under your control, and accessible even without an internet connection.**
-
----
-
-## Author
-
-Souparna Kundu
-
-Electronics and Communication Engineering (ETCE)
-
-Jadavpur University
-
-GitHub: https://github.com/Souparnoo
+*Built with React + TypeScript + Vite + MUI + IndexedDB. No backend. No account. Your data stays yours.*
