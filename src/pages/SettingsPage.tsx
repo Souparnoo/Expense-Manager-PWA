@@ -148,7 +148,7 @@ export default function SettingsPage() {
             <List disablePadding dense>
               {[
                 ['App', 'Expense Manager'],
-                ['Version', '2.2.0'],
+                ['Version', '2.2.1'],
                 ['Storage', 'IndexedDB (fully offline) / Google Drive (optional backup)'],
                 ['Records', `${expenses.length} expenses · ${friends.length} friends · ${categories.length} categories`],
               ].map(([label, value]) => (

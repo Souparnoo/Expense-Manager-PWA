@@ -85,7 +85,7 @@ export default function App() {
         <Toolbar variant="dense" sx={{ minHeight: 52 }}>
           <Box
             component="img"
-            src="public/favicon.svg"
+            src="favicon.svg"
             alt="Expense Manager"
             sx={{ width: 50, height: 50, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
           />
