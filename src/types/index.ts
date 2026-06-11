@@ -18,6 +18,7 @@ export interface QuickExpense {
   id: string;
   name: string;
   amount: number;
+  categoryId: string;
   createdAt: number;
 }
 
