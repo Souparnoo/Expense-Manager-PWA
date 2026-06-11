@@ -89,7 +89,16 @@ export default function AnalyticsPage() {
   const tooltipStyle = {
     backgroundColor: theme.palette.background.paper,
     border: `1px solid ${theme.palette.divider}`,
-    borderRadius: 8
+    borderRadius: 8,
+    color: theme.palette.text.primary,
+  };
+
+  const tooltipLabelStyle = {
+    color: theme.palette.text.secondary,
+  };
+
+  const tooltipItemStyle = {
+    color: theme.palette.text.primary,
   };
 
   return (
@@ -109,7 +118,7 @@ export default function AnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
                 <YAxis tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
-                <Tooltip formatter={(v: number) => [formatCurrency(v, settings.currency), 'Spent']} contentStyle={tooltipStyle} />
+                <Tooltip formatter={(v: number) => [formatCurrency(v, settings.currency), 'Spent']} contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                 <Bar dataKey="amount" fill={theme.palette.primary.main} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -128,7 +137,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
                   <YAxis tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
-                  <Tooltip formatter={(v: number) => [formatCurrency(v, settings.currency), 'Amount']} contentStyle={tooltipStyle} />
+                  <Tooltip formatter={(v: number) => [formatCurrency(v, settings.currency), 'Amount']} contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                   <Line type="monotone" dataKey="amount" stroke={theme.palette.secondary.main}
                     strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                 </LineChart>
@@ -155,7 +164,7 @@ export default function AnalyticsPage() {
                       <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [formatCurrency(v, settings.currency), 'Total']} contentStyle={tooltipStyle} />
+                  <Tooltip formatter={(v: number) => [formatCurrency(v, settings.currency), 'Total']} contentStyle={tooltipStyle}  labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}/>
                 </PieChart>
               </ResponsiveContainer>
               {/* Legend */}
@@ -259,7 +268,7 @@ export default function AnalyticsPage() {
                       v > 0 ? `You owe ${formatCurrency(v, settings.currency)}` : `${formatCurrency(Math.abs(v), settings.currency)} owed to you`,
                       'Balance'
                     ]}
-                    contentStyle={tooltipStyle}
+                    contentStyle={tooltipStyle}  labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
                   />
                   <Bar dataKey="net" radius={[0, 4, 4, 0]}>
                     {friendBalances.map((b, i) => (

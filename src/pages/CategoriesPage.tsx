@@ -256,12 +256,10 @@ export default function CategoriesPage() {
                       <IconButton size="small" onClick={e => openEdit(cat, e)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      {!cat.isDefault && (
-                        <IconButton size="small" color="error"
-                          onClick={e => { e.stopPropagation(); setDeleteId(cat.id); }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      )}
+                      <IconButton size="small" color="error"
+                        onClick={e => { e.stopPropagation(); setDeleteId(cat.id); }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
                       {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                     </Box>
                   </ListItemButton>

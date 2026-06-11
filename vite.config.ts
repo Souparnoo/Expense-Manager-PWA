@@ -23,7 +23,7 @@ export default defineConfig({
         short_name: 'Expenses',
         description: 'Personal Expense Manager - Track, Analyze, Settle',
 
-        theme_color: '#1565C0',
+        theme_color: '#F57C00',
         background_color: '#0A0E1A',
 
         display: 'standalone',

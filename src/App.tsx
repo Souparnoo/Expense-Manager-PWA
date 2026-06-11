@@ -83,13 +83,12 @@ export default function App() {
         borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary'
       }}>
         <Toolbar variant="dense" sx={{ minHeight: 52 }}>
-          <Box sx={{
-            width: 32, height: 32, borderRadius: 2,
-            background: 'linear-gradient(135deg, #1565C0 0%, #7B1FA2 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 1.5
-          }}>
-            <Typography sx={{ color: 'white', fontWeight: 800, fontSize: '0.85rem' }}>₹</Typography>
-          </Box>
+          <Box
+            component="img"
+            src="public/favicon.svg"
+            alt="Expense Manager"
+            sx={{ width: 50, height: 50, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
+          />
           <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
             Expense Manager
           </Typography>

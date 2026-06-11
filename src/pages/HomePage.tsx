@@ -17,15 +17,15 @@ export default function HomePage({ onManageQuickExpenses }: Props) {
       <TransactionSelectors />
       <Divider sx={{ opacity: 0.4 }} />
 
-      {/* Category selector */}
-      <Box sx={{ pt: 1.5 }}>
-        <CategorySelector />
-      </Box>
-      <Divider sx={{ opacity: 0.4, mx: 2 }} />
-
       {/* Quick Expenses */}
       <Box sx={{ pt: 1.5 }}>
         <QuickExpenseButtons onManage={onManageQuickExpenses} />
+      </Box>
+      <Divider sx={{ opacity: 0.4, mx: 2 }} />
+
+      {/* Category selector */}
+      <Box sx={{ pt: 1.5 }}>
+        <CategorySelector />
       </Box>
       <Divider sx={{ opacity: 0.4, mx: 2 }} />
 
