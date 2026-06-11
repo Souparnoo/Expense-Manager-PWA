@@ -1,30 +1,37 @@
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
-import type { Expense, Friend, Settlement } from '../types';
+import type { Expense, Friend, Settlement, Category } from '../types';
 import { getFriendName, formatDate } from './index';
 
-function colWidths(data: string[][]): { wch: number }[] {
+function colWidths(data: (string | number)[][]): { wch: number }[] {
   if (!data.length) return [];
   const cols = data[0].length;
   return Array.from({ length: cols }, (_, i) => ({
-    wch: Math.max(...data.map(row => String(row[i] || '').length), 10)
+    wch: Math.max(...data.map(row => String(row[i] ?? '').length), 10)
   }));
+}
+
+function getCategoryName(categoryId: string | undefined, categories: Category[]): string {
+  if (!categoryId) return 'Other';
+  return categories.find(c => c.id === categoryId)?.name ?? 'Other';
 }
 
 export function exportToExcel(
   expenses: Expense[],
   friends: Friend[],
-  settlements: Settlement[]
+  settlements: Settlement[],
+  categories: Category[] = []
 ): void {
   const wb = XLSX.utils.book_new();
   const sorted = [...expenses].sort((a, b) => a.timestamp - b.timestamp);
 
-  // ── Sheet 1: ALL_HISTORY ────────────────────────────────────────────────
-  const allHeaders = ['Date', 'Time', 'Expense Name', 'Amount', 'Paid By', 'Paid For'];
+  // ── Sheet 1: ALL_HISTORY ─────────────────────────────────────────────────
+  const allHeaders = ['Date', 'Time', 'Expense Name', 'Category', 'Amount', 'Paid By', 'Paid For'];
   const allRows = sorted.map(e => [
     formatDate(e.date),
     e.time,
     e.name,
+    getCategoryName(e.categoryId, categories),
     e.amount,
     getFriendName(e.paidBy, friends),
     getFriendName(e.paidFor, friends)
@@ -36,19 +43,20 @@ export function exportToExcel(
     ...allRows,
     [],
     ['Total Transactions', totalTxn],
-    ['Total Amount', totalAmt]
+    ['Total Amount', '', '', '', totalAmt]
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(allData);
-  ws1['!cols'] = colWidths(allData.map(r => r.map(String)));
+  ws1['!cols'] = colWidths(allData);
   XLSX.utils.book_append_sheet(wb, ws1, 'ALL_HISTORY');
 
-  // ── Sheet 2: MY_EXPENSES ────────────────────────────────────────────────
+  // ── Sheet 2: MY_EXPENSES ─────────────────────────────────────────────────
   const myExpenses = sorted.filter(e => e.paidFor === 'me');
-  const myHeaders = ['Date', 'Time', 'Expense Name', 'Paid By', 'Amount'];
+  const myHeaders = ['Date', 'Time', 'Expense Name', 'Category', 'Paid By', 'Amount'];
   const myRows = myExpenses.map(e => [
     formatDate(e.date),
     e.time,
     e.name,
+    getCategoryName(e.categoryId, categories),
     getFriendName(e.paidBy, friends),
     e.amount
   ]);
@@ -57,10 +65,10 @@ export function exportToExcel(
     myHeaders,
     ...myRows,
     [],
-    ['Total Personal Expense', myTotal]
+    ['Total Personal Expense', '', '', '', '', myTotal]
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(myData);
-  ws2['!cols'] = colWidths(myData.map(r => r.map(String)));
+  ws2['!cols'] = colWidths(myData);
   XLSX.utils.book_append_sheet(wb, ws2, 'MY_EXPENSES');
 
   // ── Per-Friend Sheets ────────────────────────────────────────────────────
@@ -70,7 +78,7 @@ export function exportToExcel(
     );
     const friendSettlements = settlements.filter(s => s.friendId === friend.id);
 
-    const headers = ['Date', 'Time', 'Expense Name', 'Type', 'Paid By', 'Amount'];
+    const headers = ['Date', 'Time', 'Expense Name', 'Category', 'Type', 'Paid By', 'Amount'];
     const rows: (string | number)[][] = [];
 
     for (const e of friendExpenses) {
@@ -78,27 +86,29 @@ export function exportToExcel(
       let amount = 0;
       if (e.paidBy === friend.id && e.paidFor === 'me') {
         type = 'I_OWE_FRIEND';
-        amount = e.amount; // positive: friend paid, I owe
+        amount = e.amount;
       } else if (e.paidBy === 'me' && e.paidFor === friend.id) {
         type = 'FRIEND_OWES_ME';
-        amount = -e.amount; // negative: I paid, friend owes
+        amount = -e.amount;
       }
       rows.push([
         formatDate(e.date),
         e.time,
         e.name,
+        getCategoryName(e.categoryId, categories),
         type,
         getFriendName(e.paidBy, friends),
         amount
       ]);
     }
 
-    // Add settlements
+    // Settlements (no category)
     for (const s of friendSettlements) {
       rows.push([
         formatDate(s.date),
         s.time,
         s.note || 'Settlement',
+        '—',
         'SETTLEMENT',
         s.amount > 0 ? friend.name : 'Me',
         s.amount
@@ -106,36 +116,29 @@ export function exportToExcel(
     }
 
     // Net balance
-    let iOweFriend = friendExpenses
-      .filter(e => e.paidBy === friend.id && e.paidFor === 'me')
-      .reduce((s, e) => s + e.amount, 0);
-    let friendOwesMe = friendExpenses
-      .filter(e => e.paidBy === 'me' && e.paidFor === friend.id)
-      .reduce((s, e) => s + e.amount, 0);
+    const iOweFriend   = friendExpenses.filter(e => e.paidBy === friend.id && e.paidFor === 'me').reduce((s, e) => s + e.amount, 0);
+    const friendOwesMe = friendExpenses.filter(e => e.paidBy === 'me' && e.paidFor === friend.id).reduce((s, e) => s + e.amount, 0);
     const settlementNet = friendSettlements.reduce((s, se) => s + se.amount, 0);
-    const rawNet = iOweFriend - friendOwesMe;
-    const net = rawNet + settlementNet;
+    const net = iOweFriend - friendOwesMe + settlementNet;
 
     let status = '';
-    if (net > 0) status = `I owe ${friend.name} ${Math.abs(net).toFixed(2)}`;
-    else if (net < 0) status = `${friend.name} owes me ${Math.abs(net).toFixed(2)}`;
-    else status = 'Settled up';
+    if (net > 0.01)       status = `I owe ${friend.name} ₹${Math.abs(net).toFixed(2)}`;
+    else if (net < -0.01) status = `${friend.name} owes me ₹${Math.abs(net).toFixed(2)}`;
+    else                  status = 'Settled up';
 
     const sheetData = [
       headers,
       ...rows,
       [],
       ['Friend', friend.name],
-      ['Net Balance', net],
+      ['Net Balance', '', '', '', '', '', net],
       ['Status', status]
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = colWidths(sheetData.map(r => r.map(String)));
-    const sheetName = friend.name.toUpperCase().slice(0, 31);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    ws['!cols'] = colWidths(sheetData);
+    XLSX.utils.book_append_sheet(wb, ws, friend.name.toUpperCase().slice(0, 31));
   }
 
-  const fileName = `expense-manager-${dayjs().format('YYYY-MM-DD')}.xlsx`;
-  XLSX.writeFile(wb, fileName);
+  XLSX.writeFile(wb, `expense-manager-${dayjs().format('YYYY-MM-DD')}.xlsx`);
 }

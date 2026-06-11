@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Box, List, ListItem, ListItemText, ListItemSecondaryAction,
   IconButton, Fab, Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, InputAdornment, Typography, Menu, MenuItem
+  Button, TextField, InputAdornment, Typography, Menu, MenuItem, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -21,12 +21,13 @@ interface Props {
 }
 
 export default function QuickExpensesPage({ onBack }: Props) {
-  const { quickExpenses, settings, reloadQuickExpenses } = useApp();
+  const { quickExpenses, categories, settings, reloadQuickExpenses } = useApp();
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<QuickExpense | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [amountInput, setAmountInput] = useState('');
+  const [categoryInput, setCategoryInput] = useState('other');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuTarget, setMenuTarget] = useState<QuickExpense | null>(null);
@@ -38,6 +39,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
     setEditing(null);
     setNameInput('');
     setAmountInput('');
+    setCategoryInput('other');
     setOpen(true);
   };
 
@@ -45,6 +47,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
     setEditing(qe);
     setNameInput(qe.name);
     setAmountInput(String(qe.amount));
+    setCategoryInput(qe.categoryId || 'other');
     setOpen(true);
     setMenuAnchor(null);
   };
@@ -58,6 +61,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
       id: editing?.id || generateId(),
       name,
       amount,
+      categoryId: categoryInput,
       createdAt: editing?.createdAt || Date.now()
     };
     await db.saveQuickExpense(qe);
@@ -82,6 +86,8 @@ export default function QuickExpensesPage({ onBack }: Props) {
     }, 600);
   };
 
+  const getCat = (id: string) => categories.find(c => c.id === id) ?? categories.find(c => c.id === 'other');
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PageHeader title="Quick Expenses" onBack={onBack} />
@@ -91,7 +97,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
           <EmptyState
             icon={<BoltIcon />}
             title="No Quick Expenses"
-            subtitle="Create shortcuts for your most frequent expenses like Tea, Bus, Lunch, etc."
+            subtitle="Create shortcuts for frequent expenses like Tea, Bus, Lunch."
             action={
               <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
                 Add Quick Expense
@@ -100,81 +106,122 @@ export default function QuickExpensesPage({ onBack }: Props) {
           />
         ) : (
           <List sx={{ px: 1 }}>
-            {quickExpenses.map(qe => (
-              <ListItem
-                key={qe.id}
-                sx={{
-                  borderRadius: 2, mb: 0.5,
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-                onTouchStart={e => handleLongPress(e, qe)}
-                onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-                onContextMenu={e => { e.preventDefault(); setMenuTarget(qe); setMenuAnchor(e.currentTarget as HTMLElement); }}
-              >
-                <ListItemText
-                  primary={<Typography fontWeight={600}>{qe.name}</Typography>}
-                  secondary={formatCurrency(qe.amount, settings.currency)}
-                />
-                <ListItemSecondaryAction>
-                  <IconButton size="small" onClick={() => openEdit(qe)} sx={{ mr: 0.5 }}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" color="error" onClick={() => setDeleteId(qe.id)}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </ListItemSecondaryAction>
-              </ListItem>
-            ))}
+            {quickExpenses.map(qe => {
+              const cat = getCat(qe.categoryId || 'other');
+              return (
+                <ListItem
+                  key={qe.id}
+                  sx={{ borderRadius: 2, mb: 0.5, '&:hover': { backgroundColor: 'action.hover' } }}
+                  onTouchStart={e => handleLongPress(e, qe)}
+                  onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                  onContextMenu={e => { e.preventDefault(); setMenuTarget(qe); setMenuAnchor(e.currentTarget as HTMLElement); }}
+                >
+                  {/* Category icon badge */}
+                  <Box sx={{
+                    width: 36, height: 36, borderRadius: 2,
+                    backgroundColor: `${cat?.color ?? '#757575'}22`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '1.1rem', mr: 1.5, flexShrink: 0
+                  }}>
+                    {cat?.icon ?? '📦'}
+                  </Box>
+                  <ListItemText
+                    primary={<Typography fontWeight={600}>{qe.name}</Typography>}
+                    secondary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
+                        <Typography variant="caption" fontWeight={700}>
+                          {formatCurrency(qe.amount, settings.currency)}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={cat?.name ?? 'Other'}
+                          sx={{
+                            height: 18, fontSize: '0.65rem',
+                            backgroundColor: `${cat?.color ?? '#757575'}22`,
+                            color: cat?.color ?? '#757575',
+                          }}
+                        />
+                      </Box>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <IconButton size="small" onClick={() => openEdit(qe)} sx={{ mr: 0.5 }}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" color="error" onClick={() => setDeleteId(qe.id)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </Box>
 
-      <Fab
-        color="primary"
-        onClick={openAdd}
-        sx={{ position: 'fixed', bottom: 80, right: 20 }}
-      >
+      <Fab color="primary" onClick={openAdd} sx={{ position: 'fixed', bottom: 80, right: 20 }}>
         <AddIcon />
       </Fab>
 
-      {/* Context menu */}
       <Menu
         open={Boolean(menuAnchor && menuTarget)}
         anchorEl={menuAnchor}
         onClose={() => { setMenuAnchor(null); setMenuTarget(null); }}
       >
         <MenuItem onClick={() => menuTarget && openEdit(menuTarget)}>Edit</MenuItem>
-        <MenuItem
-          sx={{ color: 'error.main' }}
-          onClick={() => { if (menuTarget) setDeleteId(menuTarget.id); setMenuAnchor(null); }}
-        >
+        <MenuItem sx={{ color: 'error.main' }}
+          onClick={() => { if (menuTarget) setDeleteId(menuTarget.id); setMenuAnchor(null); }}>
           Delete
         </MenuItem>
       </Menu>
 
-      {/* Add/Edit Dialog */}
+      {/* Add / Edit Dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>{editing ? 'Edit Quick Expense' : 'Add Quick Expense'}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
-              label="Name"
-              value={nameInput}
+              label="Name" value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               placeholder="e.g. Tea, Bus, Lunch"
               fullWidth size="small" autoFocus
             />
             <TextField
-              label="Amount"
-              type="number"
-              value={amountInput}
+              label="Amount" type="number" value={amountInput}
               onChange={e => setAmountInput(e.target.value)}
               fullWidth size="small"
-              InputProps={{
-                startAdornment: <InputAdornment position="start">{settings.currency}</InputAdornment>
-              }}
+              InputProps={{ startAdornment: <InputAdornment position="start">{settings.currency}</InputAdornment> }}
               inputProps={{ min: 0, step: '1' }}
             />
+            {/* Category selector */}
+            <Box>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}
+                sx={{ mb: 0.75, display: 'block', letterSpacing: '0.06em' }}>
+                DEFAULT CATEGORY
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {categories.map(cat => {
+                  const sel = categoryInput === cat.id;
+                  return (
+                    <Chip
+                      key={cat.id}
+                      label={`${cat.icon} ${cat.name}`}
+                      onClick={() => setCategoryInput(cat.id)}
+                      size="small"
+                      sx={{
+                        fontWeight: 600, cursor: 'pointer',
+                        border: '2px solid',
+                        borderColor: sel ? cat.color : 'transparent',
+                        backgroundColor: sel ? `${cat.color}22` : 'action.hover',
+                        color: sel ? cat.color : 'text.secondary',
+                        transition: 'all 0.1s',
+                        '&:hover': { backgroundColor: `${cat.color}22`, borderColor: cat.color, color: cat.color },
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
@@ -186,7 +233,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
       <ConfirmDialog
         open={Boolean(deleteId)}
         title="Delete Quick Expense"
-        message="This will delete the quick expense shortcut. Historical transactions are not affected."
+        message="This will delete the shortcut. Historical transactions are not affected."
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
       />

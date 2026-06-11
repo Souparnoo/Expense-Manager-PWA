@@ -11,9 +11,12 @@ interface Props {
   onManage: () => void;
 }
 
+// Default category id on first load — used to detect "user hasn't changed category"
+const INITIAL_CATEGORY = 'other';
+
 export default function QuickExpenseButtons({ onManage }: Props) {
   const {
-    quickExpenses,
+    quickExpenses, categories,
     selectedDate, selectedTime, selectedPaidBy, selectedPaidFor,
     selectedCategoryId, reloadExpenses
   } = useApp();
@@ -24,8 +27,16 @@ export default function QuickExpenseButtons({ onManage }: Props) {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
 
-  const handleClick = async (qe: { id: string; name: string; amount: number }) => {
+  const getCat = (id: string) => categories.find(c => c.id === id);
+
+  const handleClick = async (qe: { id: string; name: string; amount: number; categoryId: string }) => {
     if (didLongPress.current) return;
+
+    // Override rule: use selectedCategoryId only if user explicitly picked something
+    // other than the default. Otherwise fall back to the quick expense's own category.
+    const userChangedCategory = selectedCategoryId !== INITIAL_CATEGORY;
+    const resolvedCategoryId = userChangedCategory ? selectedCategoryId : (qe.categoryId || 'other');
+
     const expense: Expense = {
       id: generateId(),
       date: selectedDate,
@@ -35,13 +46,15 @@ export default function QuickExpenseButtons({ onManage }: Props) {
       amount: qe.amount,
       paidBy: selectedPaidBy,
       paidFor: selectedPaidFor,
-      categoryId: selectedCategoryId || 'other',
+      categoryId: resolvedCategoryId,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
     await db.saveExpense(expense);
     await reloadExpenses();
-    setToast(`${qe.name} ₹${qe.amount} added!`);
+
+    const catName = getCat(resolvedCategoryId)?.name ?? 'Other';
+    setToast(`${qe.name} ₹${qe.amount} → ${catName}`);
   };
 
   const handleTouchStart = (e: React.TouchEvent, id: string) => {
@@ -82,23 +95,31 @@ export default function QuickExpenseButtons({ onManage }: Props) {
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {quickExpenses.map(qe => (
-            <Chip
-              key={qe.id}
-              label={`${qe.name} ₹${qe.amount}`}
-              onClick={() => handleClick(qe)}
-              onTouchStart={e => handleTouchStart(e, qe.id)}
-              onTouchEnd={handleTouchEnd}
-              onContextMenu={e => handleContextMenu(e, qe.id)}
-              variant="outlined"
-              size="medium"
-              sx={{
-                fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
-                '&:hover': { backgroundColor: 'primary.main', color: 'white', borderColor: 'primary.main' },
-                '&:active': { transform: 'scale(0.96)' }
-              }}
-            />
-          ))}
+          {quickExpenses.map(qe => {
+            const cat = getCat(qe.categoryId || 'other');
+            return (
+              <Chip
+                key={qe.id}
+                label={`${cat?.icon ?? '📦'} ${qe.name} ₹${qe.amount}`}
+                onClick={() => handleClick(qe)}
+                onTouchStart={e => handleTouchStart(e, qe.id)}
+                onTouchEnd={handleTouchEnd}
+                onContextMenu={e => handleContextMenu(e, qe.id)}
+                variant="outlined"
+                size="medium"
+                sx={{
+                  fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
+                  borderColor: cat?.color ?? 'divider',
+                  '&:hover': {
+                    backgroundColor: cat ? `${cat.color}22` : 'action.selected',
+                    borderColor: cat?.color,
+                    color: cat?.color,
+                  },
+                  '&:active': { transform: 'scale(0.96)' }
+                }}
+              />
+            );
+          })}
         </Box>
       )}
 
@@ -112,9 +133,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
       </Menu>
 
       <Snackbar
-        open={Boolean(toast)}
-        autoHideDuration={2000}
-        onClose={() => setToast(null)}
+        open={Boolean(toast)} autoHideDuration={2000} onClose={() => setToast(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert severity="success" variant="filled" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>

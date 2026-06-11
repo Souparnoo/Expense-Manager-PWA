@@ -9,6 +9,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import HandshakeIcon from '@mui/icons-material/Handshake';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CategoryIcon from '@mui/icons-material/Category';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 
 import HomePage from './pages/HomePage';
@@ -17,12 +18,12 @@ import FriendsPage from './pages/FriendsPage';
 import SettlementPage from './pages/SettlementPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
+import CategoriesPage from './pages/CategoriesPage';
 import QuickExpensesPage from './pages/QuickExpensesPage';
 import FriendHistoryPage from './pages/FriendHistoryPage';
-import CategoriesPage from './pages/CategoriesPage';
 
-type Tab = 'home' | 'history' | 'friends' | 'settlement' | 'analytics' | 'settings';
-type SubPage = 'quick-expenses' | 'friend-history' | 'categories' | null;
+type Tab = 'home' | 'history' | 'friends' | 'settlement' | 'analytics' | 'categories' | 'settings';
+type SubPage = 'quick-expenses' | 'friend-history' | null;
 
 const TAB_LABELS: Record<Tab, string> = {
   home: 'Home',
@@ -30,8 +31,12 @@ const TAB_LABELS: Record<Tab, string> = {
   friends: 'Friends',
   settlement: 'Settle',
   analytics: 'Analytics',
-  settings: 'Settings'
+  categories: 'Categories',
+  settings: 'Settings',
 };
+
+const SIDEBAR_TABS: Tab[] = ['home', 'history', 'analytics', 'friends', 'settlement', 'categories', 'settings'];
+const BOTTOM_TABS:  Tab[] = ['home', 'history', 'friends', 'categories', 'analytics', 'settings'];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
@@ -46,7 +51,6 @@ export default function App() {
   const renderContent = () => {
     if (subPage === 'quick-expenses') return <QuickExpensesPage onBack={() => setSubPage(null)} />;
     if (subPage === 'friend-history') return <FriendHistoryPage />;
-    if (subPage === 'categories')     return <CategoriesPage onBack={() => setSubPage(null)} />;
 
     switch (tab) {
       case 'home':       return <HomePage onManageQuickExpenses={() => setSubPage('quick-expenses')} />;
@@ -54,12 +58,26 @@ export default function App() {
       case 'friends':    return <FriendsPage />;
       case 'settlement': return <SettlementPage />;
       case 'analytics':  return <AnalyticsPage />;
-      case 'settings':   return <SettingsPage onNavigateCategories={() => setSubPage('categories')} />;
+      case 'categories': return <CategoriesPage />;
+      case 'settings':   return <SettingsPage />;
+    }
+  };
+
+  const tabIcon = (t: Tab) => {
+    switch (t) {
+      case 'home':       return <HomeIcon fontSize="small" />;
+      case 'history':    return <HistoryIcon fontSize="small" />;
+      case 'friends':    return <PeopleIcon fontSize="small" />;
+      case 'settlement': return <HandshakeIcon fontSize="small" />;
+      case 'analytics':  return <BarChartIcon fontSize="small" />;
+      case 'categories': return <CategoryIcon fontSize="small" />;
+      case 'settings':   return <SettingsIcon fontSize="small" />;
     }
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+      {/* AppBar */}
       <AppBar position="static" elevation={0} sx={{
         backgroundColor: 'background.paper',
         borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary'
@@ -84,39 +102,40 @@ export default function App() {
         </Toolbar>
       </AppBar>
 
+      {/* Body */}
       <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
         {isDesktop ? (
           <Box sx={{ display: 'flex', width: '100%' }}>
+            {/* Sidebar */}
             <Box sx={{
               width: 200, flexShrink: 0,
               borderRight: '1px solid', borderColor: 'divider',
-              display: 'flex', flexDirection: 'column', py: 2, gap: 0.5
+              display: 'flex', flexDirection: 'column', py: 2, gap: 0.5,
+              overflowY: 'auto'
             }}>
-              {(['home', 'history', 'friends', 'settlement', 'analytics', 'settings'] as Tab[]).map(t => (
-                <Box key={t} onClick={() => { setTab(t); setSubPage(null); }}
-                  sx={{
-                    mx: 1, px: 2, py: 1.5, borderRadius: 2, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 1.5,
-                    backgroundColor: tab === t && !subPage ? 'primary.main' : 'transparent',
-                    color: tab === t && !subPage ? 'white' : 'text.secondary',
-                    transition: 'all 0.15s',
-                    '&:hover': {
-                      backgroundColor: tab === t && !subPage ? 'primary.dark' : 'action.hover',
-                      color: tab === t && !subPage ? 'white' : 'text.primary'
-                    }
-                  }}
-                >
-                  {t === 'home'       && <HomeIcon fontSize="small" />}
-                  {t === 'history'    && <HistoryIcon fontSize="small" />}
-                  {t === 'friends'    && <PeopleIcon fontSize="small" />}
-                  {t === 'settlement' && <HandshakeIcon fontSize="small" />}
-                  {t === 'analytics'  && <BarChartIcon fontSize="small" />}
-                  {t === 'settings'   && <SettingsIcon fontSize="small" />}
-                  <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
-                    {TAB_LABELS[t]}
-                  </Typography>
-                </Box>
-              ))}
+              {SIDEBAR_TABS.map(t => {
+                const active = tab === t && !subPage;
+                return (
+                  <Box key={t} onClick={() => { setTab(t); setSubPage(null); }}
+                    sx={{
+                      mx: 1, px: 2, py: 1.5, borderRadius: 2, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 1.5,
+                      backgroundColor: active ? 'primary.main' : 'transparent',
+                      color: active ? 'white' : 'text.secondary',
+                      transition: 'all 0.15s',
+                      '&:hover': {
+                        backgroundColor: active ? 'primary.dark' : 'action.hover',
+                        color: active ? 'white' : 'text.primary'
+                      }
+                    }}
+                  >
+                    {tabIcon(t)}
+                    <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
+                      {TAB_LABELS[t]}
+                    </Typography>
+                  </Box>
+                );
+              })}
             </Box>
             <Box sx={{ flex: 1, overflow: 'hidden' }}>{renderContent()}</Box>
           </Box>
@@ -125,15 +144,18 @@ export default function App() {
         )}
       </Box>
 
+      {/* Mobile bottom nav — 6 tabs fitting on screen */}
       {!isDesktop && (
         <Paper elevation={0} sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
           <BottomNavigation value={tab} onChange={handleTabChange} showLabels>
-            <BottomNavigationAction label="Home"     value="home"       icon={<HomeIcon />} />
-            <BottomNavigationAction label="History"  value="history"    icon={<HistoryIcon />} />
-            <BottomNavigationAction label="Friends"  value="friends"    icon={<PeopleIcon />} />
-            <BottomNavigationAction label="Settle"   value="settlement" icon={<HandshakeIcon />} />
-            <BottomNavigationAction label="Analytics" value="analytics" icon={<BarChartIcon />} />
-            <BottomNavigationAction label="Settings" value="settings"   icon={<SettingsIcon />} />
+            {BOTTOM_TABS.map(t => (
+              <BottomNavigationAction
+                key={t}
+                label={TAB_LABELS[t]}
+                value={t}
+                icon={tabIcon(t)}
+              />
+            ))}
           </BottomNavigation>
         </Paper>
       )}
