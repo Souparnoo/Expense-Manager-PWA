@@ -40,7 +40,7 @@ export const getTheme = (mode: 'light' | 'dark') =>
         paper:   mode === 'dark' ? '#161A22' : '#FFFFFF'
       },
       text: {
-        primary:   mode === 'dark' ? '#F0EAE0' : '#312211',
+        primary:   mode === 'dark' ? '#F0EAE0' : '#1A1209',
         secondary: mode === 'dark' ? '#8A8070' : '#6D5C44'
       },
       divider: mode === 'dark' ? 'rgba(245,176,0,0.1)' : 'rgba(180,100,0,0.1)'
@@ -137,7 +137,12 @@ export const getTheme = (mode: 'light' | 'dark') =>
       MuiBottomNavigationAction: {
         styleOverrides: {
           root: {
-            minWidth: 50,
+            minWidth: 40,
+            padding: '6px 4px',
+            '& .MuiBottomNavigationAction-label': {
+              fontSize: '0.65rem',
+              '&.Mui-selected': { fontSize: '0.7rem' }
+            },
             '&.Mui-selected': {
               color: '#F57C00'   // orange active state
             }

@@ -35,8 +35,19 @@ const TAB_LABELS: Record<Tab, string> = {
   settings: 'Settings',
 };
 
+// Shorter labels for the 7-item mobile bottom nav so they don't wrap/truncate
+const BOTTOM_LABELS: Record<Tab, string> = {
+  home: 'Home',
+  history: 'History',
+  friends: 'Friends',
+  settlement: 'Settle',
+  analytics: 'Stats',
+  categories: 'Tags',
+  settings: 'More',
+};
+
 const SIDEBAR_TABS: Tab[] = ['home', 'history', 'analytics', 'friends', 'settlement', 'categories', 'settings'];
-const BOTTOM_TABS:  Tab[] = ['home', 'history', 'friends', 'categories', 'analytics', 'settings'];
+const BOTTOM_TABS:  Tab[] = ['home', 'history', 'friends', 'settlement', 'categories', 'analytics', 'settings'];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
@@ -87,7 +98,7 @@ export default function App() {
             component="img"
             src="favicon.svg"
             alt="Expense Manager"
-            sx={{ width: 50, height: 50, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
+            sx={{ width: 34, height: 34, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
           />
           <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
             Expense Manager
@@ -150,7 +161,7 @@ export default function App() {
             {BOTTOM_TABS.map(t => (
               <BottomNavigationAction
                 key={t}
-                label={TAB_LABELS[t]}
+                label={BOTTOM_LABELS[t]}
                 value={t}
                 icon={tabIcon(t)}
               />
