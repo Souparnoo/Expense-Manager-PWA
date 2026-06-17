@@ -6,6 +6,7 @@ import QuickExpenseButtons from '../components/expenses/QuickExpenseButtons';
 import ManualExpenseForm from '../components/expenses/ManualExpenseForm';
 import DashboardStats from '../components/dashboard/DashboardStats';
 import RecentTransactions from '../components/dashboard/RecentTransactions';
+import DriveBackupCard from '../components/settings/DriveBackupCard';
 
 interface Props {
   onManageQuickExpenses: () => void;
@@ -14,6 +15,7 @@ interface Props {
 export default function HomePage({ onManageQuickExpenses }: Props) {
   return (
     <Box sx={{ pb: 10, overflowY: 'auto', height: '100%' }}>
+      {/* Date / Time / Paid By / Paid For */}
       <TransactionSelectors />
       <Divider sx={{ opacity: 0.4 }} />
 
@@ -23,7 +25,7 @@ export default function HomePage({ onManageQuickExpenses }: Props) {
       </Box>
       <Divider sx={{ opacity: 0.4, mx: 2 }} />
 
-      {/* Category selector */}
+      {/* Category selector — below quick add */}
       <Box sx={{ pt: 1.5 }}>
         <CategorySelector />
       </Box>
@@ -35,8 +37,16 @@ export default function HomePage({ onManageQuickExpenses }: Props) {
       </Box>
       <Divider sx={{ opacity: 0.4 }} />
 
+      {/* Dashboard Stats */}
       <DashboardStats />
+
+      {/* Recent Transactions */}
       <RecentTransactions />
+
+      {/* Drive quick-access — only visible when signed in */}
+      <Box sx={{ pt: 1 }}>
+        <DriveBackupCard compact />
+      </Box>
     </Box>
   );
 }

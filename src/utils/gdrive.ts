@@ -1,19 +1,34 @@
 /**
- * Google Drive backup utility.
- * Uses the Google Identity Services (GIS) popup flow — no server required.
- * All data stays in the user's own Google Drive under appDataFolder (hidden app folder).
+ * Google Drive backup utility — persistent login edition.
  *
- * To use:
- *  1. Create a project in Google Cloud Console.
- *  2. Enable Google Drive API.
- *  3. Create an OAuth 2.0 Web Client ID.
- *  4. Add your domain to Authorized JavaScript origins.
- *  5. Set VITE_GOOGLE_CLIENT_ID in your .env file.
+ * Uses Google Identity Services (GIS) token client with:
+ *  - Silent re-auth on app load (no popup if previously connected)
+ *  - User email + hint stored in IndexedDB so we know who to silently re-auth
+ *  - Manual Backup Now / Restore Now buttons (no auto-sync)
+ *  - Explicit Sign Out to clear everything
+ *
+ * Setup:
+ *  1. Google Cloud Console → Enable Google Drive API
+ *  2. OAuth consent screen → External → add your domain
+ *  3. Credentials → OAuth 2.0 Web Client ID
+ *  4. Authorized JavaScript origins: http://localhost:5173 + your prod domain
+ *  5. Copy Client ID → VITE_GOOGLE_CLIENT_ID in .env
  */
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-const SCOPES    = 'https://www.googleapis.com/auth/drive.appdata';
+const SCOPES    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const BACKUP_FILENAME = 'expense-manager-backup.json';
+
+// Keys for IndexedDB settings store
+export const GDRIVE_SESSION_KEY = 'gdrive-session';
+
+export interface DriveSession {
+  email: string;
+  name: string;
+  picture: string;
+  hint: string;       // login_hint for silent re-auth
+  connectedAt: number;
+}
 
 export interface DriveFile {
   id: string;
@@ -22,56 +37,110 @@ export interface DriveFile {
   modifiedTime: string;
 }
 
+// In-memory token — refreshed silently on expiry
 let accessToken: string | null = null;
+let tokenClient: any = null;
 
-// ── Auth ─────────────────────────────────────────────────────────────────────
+// ── Configuration check ───────────────────────────────────────────────────────
 
 export function isDriveConfigured(): boolean {
   return Boolean(CLIENT_ID && CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID');
 }
 
-export async function signInWithGoogle(): Promise<string> {
-  if (!isDriveConfigured()) {
-    throw new Error('Google Client ID not configured. Add VITE_GOOGLE_CLIENT_ID to your .env file.');
-  }
+// ── Load GIS script ───────────────────────────────────────────────────────────
 
+function loadGISScript(): Promise<void> {
   return new Promise((resolve, reject) => {
-    // Load GIS script if not already loaded
-    const existingScript = document.getElementById('gis-script');
-    const doAuth = () => {
-      const client = (window as any).google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        callback: (response: any) => {
-          if (response.error) {
-            reject(new Error(response.error));
-          } else {
-            accessToken = response.access_token;
-            resolve(response.access_token);
-          }
-        },
-      });
-      client.requestAccessToken({ prompt: 'consent' });
-    };
-
-    if ((window as any).google?.accounts?.oauth2) {
-      doAuth();
-    } else {
-      const script = document.createElement('script');
-      script.id = 'gis-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.onload = doAuth;
-      script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
-      document.head.appendChild(script);
-    }
+    if ((window as any).google?.accounts?.oauth2) { resolve(); return; }
+    const existing = document.getElementById('gis-script');
+    if (existing) { existing.addEventListener('load', () => resolve()); return; }
+    const script = document.createElement('script');
+    script.id = 'gis-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
+    document.head.appendChild(script);
   });
 }
 
+// ── Get user info from Google ─────────────────────────────────────────────────
+
+async function fetchUserInfo(token: string): Promise<{ email: string; name: string; picture: string }> {
+  const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error('Failed to fetch user info');
+  return res.json();
+}
+
+// ── Core token request ────────────────────────────────────────────────────────
+
+function requestToken(hint: string, prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      hint,
+      callback: (response: any) => {
+        if (response.error) {
+          // popup_closed_by_user or access_denied — user cancelled
+          reject(new Error(response.error === 'access_denied' ? 'Sign-in cancelled.' : response.error));
+        } else {
+          accessToken = response.access_token;
+          resolve(response.access_token);
+        }
+      },
+    });
+    tokenClient.requestAccessToken({ prompt });
+  });
+}
+
+// ── Silent sign-in (on app load) ─────────────────────────────────────────────
+// Returns session if silently re-authed, null if not previously connected.
+// Never shows a popup — if silent fails, returns null gracefully.
+
+export async function silentSignIn(savedSession: DriveSession | null): Promise<DriveSession | null> {
+  if (!isDriveConfigured() || !savedSession) return null;
+  try {
+    await loadGISScript();
+    // prompt: '' means silent — GIS will use the browser's existing Google session
+    const token = await requestToken(savedSession.hint, '');
+    accessToken = token;
+    return savedSession; // session is still valid
+  } catch {
+    // Silent auth failed (no active Google session in browser) — user must sign in manually
+    accessToken = null;
+    return null;
+  }
+}
+
+// ── Interactive sign-in (user clicks "Sign in with Google") ──────────────────
+
+export async function signInWithGoogle(): Promise<DriveSession> {
+  if (!isDriveConfigured()) {
+    throw new Error('Google Client ID not configured. Add VITE_GOOGLE_CLIENT_ID to your .env file.');
+  }
+  await loadGISScript();
+  const token = await requestToken('', 'select_account');
+  const userInfo = await fetchUserInfo(token);
+  const session: DriveSession = {
+    email: userInfo.email,
+    name: userInfo.name,
+    picture: userInfo.picture,
+    hint: userInfo.email,   // used for silent re-auth next time
+    connectedAt: Date.now(),
+  };
+  return session;
+}
+
+// ── Sign out ──────────────────────────────────────────────────────────────────
+
 export function signOut(): void {
   if (accessToken && (window as any).google?.accounts?.oauth2) {
-    (window as any).google.accounts.oauth2.revoke(accessToken);
+    (window as any).google.accounts.oauth2.revoke(accessToken, () => {});
   }
   accessToken = null;
+  tokenClient = null;
 }
 
 export function isSignedIn(): boolean {
@@ -90,8 +159,9 @@ async function driveRequest(url: string, options: RequestInit = {}): Promise<Res
     },
   });
   if (res.status === 401) {
+    // Token expired — clear it so UI shows reconnect prompt
     accessToken = null;
-    throw new Error('Google Drive session expired. Please reconnect.');
+    throw new Error('Session expired. Please reconnect Google Drive.');
   }
   if (!res.ok) {
     const err = await res.text();
@@ -117,26 +187,21 @@ export async function uploadBackup(content: string): Promise<DriveFile> {
   const blob = new Blob([content], { type: 'application/json' });
 
   let res: Response;
-
   if (existing) {
-    // Update existing file
     res = await driveRequest(
       `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media&fields=id,name,size,modifiedTime`,
       { method: 'PATCH', body: blob, headers: { 'Content-Type': 'application/json' } }
     );
   } else {
-    // Create new file in appDataFolder
     const metadata = JSON.stringify({ name: BACKUP_FILENAME, parents: ['appDataFolder'] });
     const form = new FormData();
     form.append('metadata', new Blob([metadata], { type: 'application/json' }));
     form.append('file', blob);
-
     res = await driveRequest(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,modifiedTime',
       { method: 'POST', body: form }
     );
   }
-
   return res.json();
 }
 
@@ -145,7 +210,6 @@ export async function uploadBackup(content: string): Promise<DriveFile> {
 export async function downloadBackup(): Promise<string> {
   const file = await findBackupFile();
   if (!file) throw new Error('No backup found in Google Drive.');
-
   const res = await driveRequest(
     `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`
   );
@@ -153,9 +217,6 @@ export async function downloadBackup(): Promise<string> {
 }
 
 export async function getBackupFileMeta(): Promise<DriveFile | null> {
-  try {
-    return await findBackupFile();
-  } catch {
-    return null;
-  }
+  try { return await findBackupFile(); }
+  catch { return null; }
 }

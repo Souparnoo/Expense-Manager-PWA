@@ -18,7 +18,7 @@ export interface QuickExpense {
   id: string;
   name: string;
   amount: number;
-  categoryId: string;
+  categoryId: string;   // default category for this quick expense
   createdAt: number;
 }
 
@@ -58,7 +58,13 @@ export interface Budget {
 }
 
 export interface DriveBackupMeta {
+  // Session info (persisted so silent re-auth works on next open)
+  email: string;
+  name: string;
+  picture: string;
+  hint: string;
   connectedAt: number;
+  // Backup metadata
   lastBackupAt: number | null;
   lastBackupFileName: string | null;
   lastBackupSize: number | null;

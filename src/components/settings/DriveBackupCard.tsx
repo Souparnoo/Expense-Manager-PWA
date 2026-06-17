@@ -1,34 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Card, CardContent, Typography, Button, Switch, FormControlLabel,
   Alert, TextField, Dialog, DialogTitle, DialogContent, DialogActions,
-  Chip, CircularProgress, Divider, InputAdornment, IconButton
+  Chip, CircularProgress, Divider, InputAdornment, IconButton, Avatar
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import LinkIcon from '@mui/icons-material/Link';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
+import GoogleIcon from '@mui/icons-material/Google';
+import LogoutIcon from '@mui/icons-material/Logout';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import SyncIcon from '@mui/icons-material/Sync';
 import { useApp } from '../../hooks/useApp';
 import * as db from '../../db';
 import * as gdrive from '../../utils/gdrive';
+import type { DriveSession } from '../../utils/gdrive';
 import { encryptData, decryptData, isEncryptedPayload } from '../../utils/crypto';
 import type { DriveBackupMeta } from '../../types';
 
-export default function DriveBackupCard() {
+interface Props {
+  /** When true, shows a compact version for embedding in HomePage */
+  compact?: boolean;
+}
+
+export default function DriveBackupCard({ compact = false }: Props) {
   const { settings, updateSettings, reloadAll } = useApp();
 
-  const [connected, setConnected] = useState(gdrive.isSignedIn());
+  const [session, setSession] = useState<DriveSession | null>(null);
+  const [silentLoading, setSilentLoading] = useState(true); // true while attempting silent re-auth on mount
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [status, setStatus] = useState<{ msg: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
   const [encryptEnabled, setEncryptEnabled] = useState(settings.driveBackup?.encryptionEnabled ?? false);
   const [fileMeta, setFileMeta] = useState<{ size: number; modifiedTime: string } | null>(null);
 
-  // Password dialogs
   const [backupPasswordDialog, setBackupPasswordDialog] = useState(false);
   const [restorePasswordDialog, setRestorePasswordDialog] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -38,74 +45,116 @@ export default function DriveBackupCard() {
 
   const driveConfigured = gdrive.isDriveConfigured();
 
+  // ── Silent re-auth on app load ──────────────────────────────────────────────
   useEffect(() => {
-    if (connected) fetchFileMeta();
-  }, [connected]);
+    async function trySilentAuth() {
+      if (!driveConfigured || !settings.driveBackup?.hint) {
+        setSilentLoading(false);
+        return;
+      }
+      const savedSession: DriveSession = {
+        email: settings.driveBackup.email,
+        name: settings.driveBackup.name,
+        picture: settings.driveBackup.picture,
+        hint: settings.driveBackup.hint,
+        connectedAt: settings.driveBackup.connectedAt,
+      };
+      const result = await gdrive.silentSignIn(savedSession);
+      if (result) {
+        setSession(result);
+        fetchFileMeta();
+      }
+      setSilentLoading(false);
+    }
+    trySilentAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const fetchFileMeta = async () => {
+  const fetchFileMeta = useCallback(async () => {
     try {
       const f = await gdrive.getBackupFileMeta();
       if (f) setFileMeta({ size: Number(f.size), modifiedTime: f.modifiedTime });
     } catch {}
-  };
+  }, []);
 
-  const handleConnect = async () => {
+  // ── Sign in ─────────────────────────────────────────────────────────────────
+  const handleSignIn = async () => {
     setLoading(true);
     setStatus(null);
     try {
-      await gdrive.signInWithGoogle();
-      setConnected(true);
+      const newSession = await gdrive.signInWithGoogle();
+      setSession(newSession);
+      await persistSession(newSession);
       await fetchFileMeta();
-      // Persist connection metadata
-      await updateSettings({
-        driveBackup: {
-          ...settings.driveBackup,
-          connectedAt: Date.now(),
-          lastBackupAt: settings.driveBackup?.lastBackupAt ?? null,
-          lastBackupFileName: settings.driveBackup?.lastBackupFileName ?? null,
-          lastBackupSize: settings.driveBackup?.lastBackupSize ?? null,
-          encryptionEnabled: encryptEnabled,
-        }
-      });
-      setStatus({ msg: 'Google Drive connected!', type: 'success' });
+      setStatus({ msg: `Signed in as ${newSession.email}`, type: 'success' });
     } catch (err: any) {
-      setStatus({ msg: err.message || 'Connection failed.', type: 'error' });
+      setStatus({ msg: err.message || 'Sign-in failed.', type: 'error' });
     }
     setLoading(false);
   };
 
-  const handleDisconnect = () => {
-    gdrive.signOut();
-    setConnected(false);
-    setFileMeta(null);
-    setStatus({ msg: 'Disconnected from Google Drive.', type: 'info' });
+  const persistSession = async (s: DriveSession) => {
+    const meta: DriveBackupMeta = {
+      email: s.email,
+      name: s.name,
+      picture: s.picture,
+      hint: s.hint,
+      connectedAt: s.connectedAt,
+      lastBackupAt: settings.driveBackup?.lastBackupAt ?? null,
+      lastBackupFileName: settings.driveBackup?.lastBackupFileName ?? null,
+      lastBackupSize: settings.driveBackup?.lastBackupSize ?? null,
+      encryptionEnabled: encryptEnabled,
+    };
+    await updateSettings({ driveBackup: meta });
   };
 
+  // ── Sign out ────────────────────────────────────────────────────────────────
+  const handleSignOut = async () => {
+    gdrive.signOut();
+    setSession(null);
+    setFileMeta(null);
+    // Clear session from persisted settings
+    await updateSettings({
+      driveBackup: {
+        email: '', name: '', picture: '', hint: '',
+        connectedAt: 0,
+        lastBackupAt: settings.driveBackup?.lastBackupAt ?? null,
+        lastBackupFileName: settings.driveBackup?.lastBackupFileName ?? null,
+        lastBackupSize: settings.driveBackup?.lastBackupSize ?? null,
+        encryptionEnabled: encryptEnabled,
+      }
+    });
+    setStatus({ msg: 'Signed out of Google Drive.', type: 'info' });
+  };
+
+  // ── Backup ──────────────────────────────────────────────────────────────────
   const doBackup = async (password?: string) => {
     setLoading(true);
     setStatus(null);
     try {
       const data = await db.exportAllData();
       let content: string;
-
       if (encryptEnabled && password) {
         const payload = await encryptData(JSON.stringify(data), password);
         content = JSON.stringify(payload);
       } else {
         content = JSON.stringify(data, null, 2);
       }
-
       const uploaded = await gdrive.uploadBackup(content);
-      const meta: DriveBackupMeta = {
-        connectedAt: settings.driveBackup?.connectedAt ?? Date.now(),
+      const updatedMeta: DriveBackupMeta = {
+        email: session!.email,
+        name: session!.name,
+        picture: session!.picture,
+        hint: session!.hint,
+        connectedAt: session!.connectedAt,
         lastBackupAt: Date.now(),
         lastBackupFileName: uploaded.name,
         lastBackupSize: Number(uploaded.size),
         encryptionEnabled: encryptEnabled,
       };
-      await updateSettings({ driveBackup: meta });
+      await updateSettings({ driveBackup: updatedMeta });
       await fetchFileMeta();
-      setStatus({ msg: `Backup uploaded${encryptEnabled ? ' (encrypted)' : ''}!`, type: 'success' });
+      setStatus({ msg: `Backup complete${encryptEnabled ? ' (encrypted)' : ''}!`, type: 'success' });
     } catch (err: any) {
       setStatus({ msg: err.message || 'Backup failed.', type: 'error' });
     }
@@ -116,23 +165,19 @@ export default function DriveBackupCard() {
   };
 
   const handleBackupNow = () => {
-    if (encryptEnabled) {
-      setBackupPasswordDialog(true);
-    } else {
-      doBackup();
-    }
+    if (encryptEnabled) setBackupPasswordDialog(true);
+    else doBackup();
   };
 
+  // ── Restore ─────────────────────────────────────────────────────────────────
   const doRestore = async (content: string, password?: string) => {
     setLoading(true);
     setStatus(null);
     try {
       let jsonStr = content;
       const parsed = JSON.parse(content);
-
       if (isEncryptedPayload(parsed)) {
         if (!password) {
-          // Need password — store raw and open dialog
           setRestoreData(content);
           setRestorePasswordDialog(true);
           setLoading(false);
@@ -140,7 +185,6 @@ export default function DriveBackupCard() {
         }
         jsonStr = await decryptData(parsed, password);
       }
-
       const data = JSON.parse(jsonStr);
       await db.importAllData(data);
       await reloadAll();
@@ -183,18 +227,74 @@ export default function DriveBackupCard() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatTime = (iso: string) =>
-    new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  const isConnected = Boolean(session) && gdrive.isSignedIn();
 
+  // ── Compact mode (for HomePage quick-access card) ───────────────────────────
+  if (compact) {
+    if (!driveConfigured) return null;
+    if (silentLoading) return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5 }}>
+        <CircularProgress size={16} />
+        <Typography variant="caption" color="text.secondary">Connecting to Google Drive…</Typography>
+      </Box>
+    );
+    if (!isConnected) return null; // Only show compact card if signed in
+
+    return (
+      <Card sx={{ mb: 2, mx: 2 }}>
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Avatar src={session!.picture} sx={{ width: 28, height: 28 }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="caption" fontWeight={700} noWrap>{session!.name}</Typography>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>
+                {session!.email}
+              </Typography>
+            </Box>
+            {settings.driveBackup?.lastBackupAt && (
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem', flexShrink: 0 }}>
+                {new Date(settings.driveBackup.lastBackupAt).toLocaleDateString('en-IN')}
+              </Typography>
+            )}
+          </Box>
+          {status && (
+            <Alert severity={status.type} sx={{ mb: 1, py: 0.25, borderRadius: 2 }} onClose={() => setStatus(null)}>
+              {status.msg}
+            </Alert>
+          )}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained" size="small" fullWidth
+              startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <CloudUploadIcon sx={{ fontSize: 16 }} />}
+              onClick={handleBackupNow} disabled={loading}
+              sx={{ fontSize: '0.75rem', py: 0.75 }}
+            >
+              Backup
+            </Button>
+            <Button
+              variant="outlined" size="small" fullWidth
+              startIcon={<CloudDownloadIcon sx={{ fontSize: 16 }} />}
+              onClick={handleRestoreFromDrive} disabled={loading}
+              sx={{ fontSize: '0.75rem', py: 0.75 }}
+            >
+              Restore
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── Full settings card ───────────────────────────────────────────────────────
   return (
     <>
       <Card sx={{ mb: 2 }}>
         <CardContent>
           {/* Header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <CloudUploadIcon fontSize="small" color="primary" />
+            <GoogleIcon fontSize="small" sx={{ color: '#4285F4' }} />
             <Typography fontWeight={700}>Google Drive Backup</Typography>
-            {connected && (
+            {isConnected && (
               <Chip size="small" icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
                 label="Connected" color="success" sx={{ ml: 'auto' }} />
             )}
@@ -203,7 +303,6 @@ export default function DriveBackupCard() {
           {!driveConfigured && (
             <Alert severity="warning" sx={{ mb: 1.5, borderRadius: 2 }}>
               Add <strong>VITE_GOOGLE_CLIENT_ID</strong> to your <code>.env</code> file to enable Google Drive backup.
-              See <code>src/utils/gdrive.ts</code> for setup instructions.
             </Alert>
           )}
 
@@ -213,34 +312,71 @@ export default function DriveBackupCard() {
             </Alert>
           )}
 
-          {/* Connect / Disconnect */}
-          {!connected ? (
-            <Button
-              variant="contained"
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <LinkIcon />}
-              onClick={handleConnect}
-              disabled={loading || !driveConfigured}
-              fullWidth sx={{ mb: 1.5 }}
-            >
-              Connect Google Drive
-            </Button>
-          ) : (
+          {/* Silent loading state */}
+          {silentLoading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, p: 1.5,
+              borderRadius: 2, backgroundColor: 'action.hover' }}>
+              <SyncIcon fontSize="small" sx={{ animation: 'spin 1s linear infinite',
+                '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } } }} />
+              <Typography variant="body2" color="text.secondary">Reconnecting to Google Drive…</Typography>
+            </Box>
+          )}
+
+          {/* Not connected */}
+          {!silentLoading && !isConnected && (
             <>
-              {/* Status info */}
-              {(fileMeta || settings.driveBackup?.lastBackupAt) && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Sign in with Google to back up your data to your own Drive. You only need to do this once — the app will stay signed in automatically.
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <GoogleIcon />}
+                onClick={handleSignIn}
+                disabled={loading || !driveConfigured}
+                fullWidth
+                sx={{
+                  backgroundColor: '#4285F4',
+                  '&:hover': { backgroundColor: '#3367D6' },
+                  boxShadow: '0 2px 10px rgba(66,133,244,0.4)'
+                }}
+              >
+                Sign in with Google
+              </Button>
+            </>
+          )}
+
+          {/* Connected */}
+          {!silentLoading && isConnected && session && (
+            <>
+              {/* Account card */}
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5,
+                borderRadius: 2, backgroundColor: 'action.hover', mb: 1.5,
+                border: '1px solid', borderColor: 'success.main' + '44'
+              }}>
+                <Avatar src={session.picture} sx={{ width: 40, height: 40 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography fontWeight={700} noWrap>{session.name}</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                    {session.email}
+                  </Typography>
+                </Box>
+                <CheckCircleIcon color="success" fontSize="small" />
+              </Box>
+
+              {/* Backup status */}
+              {settings.driveBackup?.lastBackupAt && (
                 <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: 'action.hover', mb: 1.5 }}>
                   <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ letterSpacing: '0.06em' }}>
-                    BACKUP STATUS
+                    LAST BACKUP
                   </Typography>
-                  {settings.driveBackup?.lastBackupAt && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">Last backup</Typography>
-                      <Typography variant="body2" fontWeight={600}>
-                        {new Date(settings.driveBackup.lastBackupAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                      </Typography>
-                    </Box>
-                  )}
-                  {settings.driveBackup?.lastBackupFileName && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary">Date</Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {new Date(settings.driveBackup.lastBackupAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </Typography>
+                  </Box>
+                  {settings.driveBackup.lastBackupFileName && (
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.25 }}>
                       <Typography variant="body2" color="text.secondary">File</Typography>
                       <Typography variant="body2" fontWeight={600}>{settings.driveBackup.lastBackupFileName}</Typography>
@@ -256,7 +392,9 @@ export default function DriveBackupCard() {
                     <Typography variant="body2" color="text.secondary">Encryption</Typography>
                     <Chip
                       size="small"
-                      icon={encryptEnabled ? <LockIcon sx={{ fontSize: '12px !important' }} /> : <LockOpenIcon sx={{ fontSize: '12px !important' }} />}
+                      icon={encryptEnabled
+                        ? <LockIcon sx={{ fontSize: '12px !important' }} />
+                        : <LockOpenIcon sx={{ fontSize: '12px !important' }} />}
                       label={encryptEnabled ? 'Enabled' : 'Disabled'}
                       color={encryptEnabled ? 'success' : 'default'}
                       sx={{ height: 20, fontSize: '0.7rem' }}
@@ -269,7 +407,8 @@ export default function DriveBackupCard() {
               <Box sx={{ mb: 1.5 }}>
                 <FormControlLabel
                   control={
-                    <Switch checked={encryptEnabled} onChange={e => handleEncryptToggle(e.target.checked)} color="success" />
+                    <Switch checked={encryptEnabled}
+                      onChange={e => handleEncryptToggle(e.target.checked)} color="success" />
                   }
                   label={
                     <Box>
@@ -280,12 +419,12 @@ export default function DriveBackupCard() {
                 />
                 {!encryptEnabled && (
                   <Alert severity="warning" sx={{ mt: 0.75, py: 0.25, borderRadius: 2 }}>
-                    Backups are stored in readable form in your Google Drive.
+                    Backups stored in readable form in your Google Drive.
                   </Alert>
                 )}
                 {encryptEnabled && (
                   <Alert severity="info" sx={{ mt: 0.75, py: 0.25, borderRadius: 2 }}>
-                    Encrypted backups cannot be recovered if the backup password is forgotten.
+                    Encrypted backups cannot be recovered if the password is forgotten.
                   </Alert>
                 )}
               </Box>
@@ -295,34 +434,27 @@ export default function DriveBackupCard() {
               {/* Action buttons */}
               <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
                 <Button
-                  variant="contained"
+                  variant="contained" fullWidth
                   startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
-                  onClick={handleBackupNow}
-                  disabled={loading}
-                  fullWidth
+                  onClick={handleBackupNow} disabled={loading}
                 >
                   Backup Now
                 </Button>
                 <Button
-                  variant="outlined"
+                  variant="outlined" fullWidth
                   startIcon={<CloudDownloadIcon />}
-                  onClick={handleRestoreFromDrive}
-                  disabled={loading}
-                  fullWidth
+                  onClick={handleRestoreFromDrive} disabled={loading}
                 >
                   Restore
                 </Button>
               </Box>
 
               <Button
-                variant="text"
-                color="error"
-                startIcon={<LinkOffIcon />}
-                onClick={handleDisconnect}
-                size="small"
-                fullWidth
+                variant="text" color="error" fullWidth size="small"
+                startIcon={<LogoutIcon />}
+                onClick={handleSignOut}
               >
-                Disconnect Google Drive
+                Sign out of Google Drive
               </Button>
             </>
           )}
@@ -330,11 +462,14 @@ export default function DriveBackupCard() {
       </Card>
 
       {/* Backup password dialog */}
-      <Dialog open={backupPasswordDialog} onClose={() => { setBackupPasswordDialog(false); setPasswordInput(''); setPasswordConfirm(''); }} maxWidth="xs" fullWidth>
+      <Dialog
+        open={backupPasswordDialog}
+        onClose={() => { setBackupPasswordDialog(false); setPasswordInput(''); setPasswordConfirm(''); }}
+        maxWidth="xs" fullWidth
+      >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LockIcon color="success" />
-            Set Backup Password
+            <LockIcon color="success" /> Set Backup Password
           </Box>
         </DialogTitle>
         <DialogContent>
@@ -345,8 +480,7 @@ export default function DriveBackupCard() {
             <TextField
               label="Backup Password"
               type={showPassword ? 'text' : 'password'}
-              value={passwordInput}
-              onChange={e => setPasswordInput(e.target.value)}
+              value={passwordInput} onChange={e => setPasswordInput(e.target.value)}
               fullWidth size="small" autoFocus
               InputProps={{
                 endAdornment: (
@@ -361,8 +495,7 @@ export default function DriveBackupCard() {
             <TextField
               label="Confirm Password"
               type={showPassword ? 'text' : 'password'}
-              value={passwordConfirm}
-              onChange={e => setPasswordConfirm(e.target.value)}
+              value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)}
               fullWidth size="small"
               error={Boolean(passwordConfirm && passwordInput !== passwordConfirm)}
               helperText={passwordConfirm && passwordInput !== passwordConfirm ? 'Passwords do not match' : ''}
@@ -370,25 +503,24 @@ export default function DriveBackupCard() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={() => { setBackupPasswordDialog(false); setPasswordInput(''); setPasswordConfirm(''); }} color="inherit" variant="outlined">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => doBackup(passwordInput)}
-            variant="contained" color="success"
-            disabled={!passwordInput || passwordInput !== passwordConfirm || loading}
-          >
+          <Button onClick={() => { setBackupPasswordDialog(false); setPasswordInput(''); setPasswordConfirm(''); }}
+            color="inherit" variant="outlined">Cancel</Button>
+          <Button onClick={() => doBackup(passwordInput)} variant="contained" color="success"
+            disabled={!passwordInput || passwordInput !== passwordConfirm || loading}>
             {loading ? <CircularProgress size={18} color="inherit" /> : 'Encrypt & Upload'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Restore password dialog */}
-      <Dialog open={restorePasswordDialog} onClose={() => { setRestorePasswordDialog(false); setPasswordInput(''); setRestoreData(null); }} maxWidth="xs" fullWidth>
+      <Dialog
+        open={restorePasswordDialog}
+        onClose={() => { setRestorePasswordDialog(false); setPasswordInput(''); setRestoreData(null); }}
+        maxWidth="xs" fullWidth
+      >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LockIcon color="warning" />
-            Enter Backup Password
+            <LockIcon color="warning" /> Enter Backup Password
           </Box>
         </DialogTitle>
         <DialogContent>
@@ -398,8 +530,7 @@ export default function DriveBackupCard() {
           <TextField
             label="Backup Password"
             type={showPassword ? 'text' : 'password'}
-            value={passwordInput}
-            onChange={e => setPasswordInput(e.target.value)}
+            value={passwordInput} onChange={e => setPasswordInput(e.target.value)}
             fullWidth size="small" autoFocus
             onKeyDown={e => e.key === 'Enter' && restoreData && doRestore(restoreData, passwordInput)}
             InputProps={{
@@ -414,14 +545,11 @@ export default function DriveBackupCard() {
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={() => { setRestorePasswordDialog(false); setPasswordInput(''); setRestoreData(null); }} color="inherit" variant="outlined">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => restoreData && doRestore(restoreData, passwordInput)}
+          <Button onClick={() => { setRestorePasswordDialog(false); setPasswordInput(''); setRestoreData(null); }}
+            color="inherit" variant="outlined">Cancel</Button>
+          <Button onClick={() => restoreData && doRestore(restoreData, passwordInput)}
             variant="contained"
-            disabled={!passwordInput || loading}
-          >
+            disabled={!passwordInput || loading}>
             {loading ? <CircularProgress size={18} color="inherit" /> : 'Decrypt & Restore'}
           </Button>
         </DialogActions>
