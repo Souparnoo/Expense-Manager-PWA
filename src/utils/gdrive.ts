@@ -1,20 +1,3 @@
-/**
- * Google Drive backup utility — persistent login edition.
- *
- * Uses Google Identity Services (GIS) token client with:
- *  - Silent re-auth on app load (no popup if previously connected)
- *  - User email + hint stored in IndexedDB so we know who to silently re-auth
- *  - Manual Backup Now / Restore Now buttons (no auto-sync)
- *  - Explicit Sign Out to clear everything
- *
- * Setup:
- *  1. Google Cloud Console → Enable Google Drive API
- *  2. OAuth consent screen → External → add your domain
- *  3. Credentials → OAuth 2.0 Web Client ID
- *  4. Authorized JavaScript origins: http://localhost:5173 + your prod domain
- *  5. Copy Client ID → VITE_GOOGLE_CLIENT_ID in .env
- */
-
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const SCOPES    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const BACKUP_FILENAME = 'expense-manager-backup.json';
