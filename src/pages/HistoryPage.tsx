@@ -3,7 +3,7 @@ import {
   Box, List, ListItem, ListItemText, ListItemButton,
   Typography, Chip, TextField, InputAdornment, MenuItem,
   Collapse, Divider, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogActions, Button
+  DialogContent, DialogActions, Button, Tooltip
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -11,6 +11,9 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { useApp } from '../hooks/useApp';
 import {
   formatDateLong, formatCurrency,
@@ -20,7 +23,27 @@ import PageHeader from '../components/common/PageHeader';
 import EmptyState from '../components/common/EmptyState';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import * as db from '../db';
-import type { Expense } from '../types';
+import type { Expense, ConfirmationStatus } from '../types';
+
+function ConfirmationBadge({ status }: { status: ConfirmationStatus }) {
+  if (!status || status === 'none') return null;
+  if (status === 'pending') return (
+    <Tooltip title="Waiting for confirmation">
+      <HourglassEmptyIcon sx={{ fontSize: 14, color: 'warning.main' }} />
+    </Tooltip>
+  );
+  if (status === 'accepted') return (
+    <Tooltip title="Confirmed ✅">
+      <CheckCircleIcon sx={{ fontSize: 14, color: 'success.main' }} />
+    </Tooltip>
+  );
+  if (status === 'rejected') return (
+    <Tooltip title="Rejected ❌">
+      <CancelIcon sx={{ fontSize: 14, color: 'error.main' }} />
+    </Tooltip>
+  );
+  return null;
+}
 
 type SortMode = 'newest' | 'oldest' | 'highest' | 'lowest';
 
@@ -202,6 +225,7 @@ export default function HistoryPage() {
                                 primary={
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                                     <Typography variant="body2" fontWeight={600}>{e.name}</Typography>
+                                    <ConfirmationBadge status={e.confirmationStatus ?? 'none'} />
                                     <Chip size="small"
                                       label={`${getFriendName(e.paidBy, friends)} → ${getFriendName(e.paidFor, friends)}`}
                                       sx={{ height: 18, fontSize: '0.65rem', opacity: 0.7 }}

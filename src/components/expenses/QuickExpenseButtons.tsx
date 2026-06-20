@@ -3,23 +3,23 @@ import { Box, Chip, Typography, IconButton, Menu, MenuItem, Snackbar, Alert } fr
 import AddIcon from '@mui/icons-material/Add';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useApp } from '../../hooks/useApp';
+import { useFirebaseAuth } from '../../hooks/useFirebaseAuth';
 import * as db from '../../db';
 import { generateId } from '../../utils';
-import type { Expense } from '../../types';
+import { sendPaymentNotification } from '../../utils/notifications';
+import type { Expense, NotificationDirection } from '../../types';
 
-interface Props {
-  onManage: () => void;
-}
+interface Props { onManage: () => void; }
 
-// Default category id on first load — used to detect "user hasn't changed category"
 const INITIAL_CATEGORY = 'other';
 
 export default function QuickExpenseButtons({ onManage }: Props) {
   const {
-    quickExpenses, categories,
+    quickExpenses, categories, friends,
     selectedDate, selectedTime, selectedPaidBy, selectedPaidFor,
     selectedCategoryId, reloadExpenses
   } = useApp();
+  const { firebaseUser, refreshSentWatchers } = useFirebaseAuth();
 
   const [toast, setToast] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -29,11 +29,14 @@ export default function QuickExpenseButtons({ onManage }: Props) {
 
   const getCat = (id: string) => categories.find(c => c.id === id);
 
+  // Alphabetical order on the home page (storage order is by createdAt — keep
+  // that for the management page, but Home should be easy to scan A→Z)
+  const sortedQuickExpenses = [...quickExpenses].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+
   const handleClick = async (qe: { id: string; name: string; amount: number; categoryId: string }) => {
     if (didLongPress.current) return;
-
-    // Override rule: use selectedCategoryId only if user explicitly picked something
-    // other than the default. Otherwise fall back to the quick expense's own category.
     const userChangedCategory = selectedCategoryId !== INITIAL_CATEGORY;
     const resolvedCategoryId = userChangedCategory ? selectedCategoryId : (qe.categoryId || 'other');
 
@@ -47,13 +50,52 @@ export default function QuickExpenseButtons({ onManage }: Props) {
       paidBy: selectedPaidBy,
       paidFor: selectedPaidFor,
       categoryId: resolvedCategoryId,
+      confirmationStatus: 'none',
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
-    await db.saveExpense(expense);
-    await reloadExpenses();
 
     const catName = getCat(resolvedCategoryId)?.name ?? 'Other';
+
+    // Determine notification direction (covers BOTH Me→Friend and Friend→Me)
+    let notifyFriendId: string | null = null;
+    let direction: NotificationDirection | null = null;
+
+    if (selectedPaidBy === 'me' && selectedPaidFor !== 'me') {
+      notifyFriendId = selectedPaidFor;
+      direction = 'i_paid_for_you';
+    } else if (selectedPaidBy !== 'me' && selectedPaidFor === 'me') {
+      notifyFriendId = selectedPaidBy;
+      direction = 'you_paid_for_me';
+    }
+
+    if (notifyFriendId && direction && firebaseUser) {
+      const friend = friends.find(f => f.id === notifyFriendId);
+      if (friend?.linkedEmail) {
+        expense.confirmationStatus = 'pending';
+        await db.saveExpense(expense);
+        await reloadExpenses();
+
+        const notifId = await sendPaymentNotification(expense, friend, {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email!,
+          displayName: firebaseUser.displayName,
+        }, categories, direction);
+
+        if (notifId) {
+          await db.saveExpense({ ...expense, notificationId: notifId });
+          await reloadExpenses();
+          refreshSentWatchers();
+          setToast(`${qe.name} ₹${qe.amount} → ${catName} · Sent to ${friend.name}`);
+        } else {
+          setToast(`${qe.name} ₹${qe.amount} → ${catName} (${friend.name} not on app yet)`);
+        }
+        return;
+      }
+    }
+
+    await db.saveExpense(expense);
+    await reloadExpenses();
     setToast(`${qe.name} ₹${qe.amount} → ${catName}`);
   };
 
@@ -66,9 +108,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
     }, 600);
   };
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  };
+  const handleTouchEnd = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); };
 
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -89,13 +129,13 @@ export default function QuickExpenseButtons({ onManage }: Props) {
         </IconButton>
       </Box>
 
-      {quickExpenses.length === 0 ? (
+      {sortedQuickExpenses.length === 0 ? (
         <Typography variant="caption" color="text.disabled" sx={{ pl: 0.5 }}>
           Tap + to add quick expenses
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {quickExpenses.map(qe => {
+          {sortedQuickExpenses.map(qe => {
             const cat = getCat(qe.categoryId || 'other');
             return (
               <Chip
@@ -105,16 +145,11 @@ export default function QuickExpenseButtons({ onManage }: Props) {
                 onTouchStart={e => handleTouchStart(e, qe.id)}
                 onTouchEnd={handleTouchEnd}
                 onContextMenu={e => handleContextMenu(e, qe.id)}
-                variant="outlined"
-                size="medium"
+                variant="outlined" size="medium"
                 sx={{
                   fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
                   borderColor: cat?.color ?? 'divider',
-                  '&:hover': {
-                    backgroundColor: cat ? `${cat.color}22` : 'action.selected',
-                    borderColor: cat?.color,
-                    color: cat?.color,
-                  },
+                  '&:hover': { backgroundColor: cat ? `${cat.color}22` : 'action.selected', borderColor: cat?.color, color: cat?.color },
                   '&:active': { transform: 'scale(0.96)' }
                 }}
               />
@@ -123,19 +158,14 @@ export default function QuickExpenseButtons({ onManage }: Props) {
         </Box>
       )}
 
-      <Menu
-        open={Boolean(menuAnchor && menuItem)}
-        anchorEl={menuAnchor}
-        onClose={() => { setMenuAnchor(null); setMenuItem(null); }}
-      >
+      <Menu open={Boolean(menuAnchor && menuItem)} anchorEl={menuAnchor}
+        onClose={() => { setMenuAnchor(null); setMenuItem(null); }}>
         <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>Edit</MenuItem>
         <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>Delete</MenuItem>
       </Menu>
 
-      <Snackbar
-        open={Boolean(toast)} autoHideDuration={2000} onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
+      <Snackbar open={Boolean(toast)} autoHideDuration={3000} onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity="success" variant="filled" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>
           {toast}
         </Alert>

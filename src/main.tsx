@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { AppProvider, useApp } from './hooks/useApp';
+import { FirebaseAuthProvider } from './hooks/useFirebaseAuth';
 import { getTheme } from './utils/theme';
 import App from './App';
 import './index.css';
@@ -21,7 +22,9 @@ function ThemedApp() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppProvider>
-      <ThemedApp />
+      <FirebaseAuthProvider>
+        <ThemedApp />
+      </FirebaseAuthProvider>
     </AppProvider>
   </React.StrictMode>
 );

@@ -21,33 +21,26 @@ import SettingsPage from './pages/SettingsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import QuickExpensesPage from './pages/QuickExpensesPage';
 import FriendHistoryPage from './pages/FriendHistoryPage';
+import InboxPage from './pages/InboxPage';
+import NotificationBadge from './components/common/NotificationBadge';
 
-type Tab = 'home' | 'history' | 'friends' | 'settlement' | 'analytics' | 'categories' | 'settings';
+type Tab = 'home' | 'history' | 'friends' | 'settlement' | 'analytics' | 'categories' | 'inbox' | 'settings';
 type SubPage = 'quick-expenses' | 'friend-history' | null;
 
 const TAB_LABELS: Record<Tab, string> = {
-  home: 'Home',
-  history: 'History',
-  friends: 'Friends',
-  settlement: 'Settle',
-  analytics: 'Analytics',
-  categories: 'Categories',
-  settings: 'Settings',
+  home: 'Home', history: 'History', friends: 'Friends',
+  settlement: 'Settle', analytics: 'Analytics',
+  categories: 'Categories', inbox: 'Inbox', settings: 'Settings',
 };
 
-// Shorter labels for the 7-item mobile bottom nav so they don't wrap/truncate
 const BOTTOM_LABELS: Record<Tab, string> = {
-  home: 'Home',
-  history: 'History',
-  friends: 'Friends',
-  settlement: 'Settle',
-  analytics: 'Stats',
-  categories: 'Tags',
-  settings: 'More',
+  home: 'Home', history: 'Past', friends: 'Friends',
+  settlement: 'Settle', analytics: 'Stats',
+  categories: 'Tags', inbox: 'Inbox', settings: 'More',
 };
 
-const SIDEBAR_TABS: Tab[] = ['home', 'history', 'analytics', 'friends', 'settlement', 'categories', 'settings'];
-const BOTTOM_TABS:  Tab[] = ['home', 'history', 'friends', 'settlement', 'categories', 'analytics', 'settings'];
+const SIDEBAR_TABS: Tab[] = ['home', 'history', 'analytics', 'friends', 'settlement', 'categories', 'inbox', 'settings'];
+const BOTTOM_TABS:  Tab[] = ['home', 'history', 'friends', 'settlement', 'analytics', 'inbox', 'categories', 'settings'];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
@@ -55,14 +48,12 @@ export default function App() {
   const isDesktop = useMediaQuery('(min-width:768px)');
 
   const handleTabChange = (_: React.SyntheticEvent, val: Tab) => {
-    setTab(val);
-    setSubPage(null);
+    setTab(val); setSubPage(null);
   };
 
   const renderContent = () => {
     if (subPage === 'quick-expenses') return <QuickExpensesPage onBack={() => setSubPage(null)} />;
     if (subPage === 'friend-history') return <FriendHistoryPage />;
-
     switch (tab) {
       case 'home':       return <HomePage onManageQuickExpenses={() => setSubPage('quick-expenses')} />;
       case 'history':    return <HistoryPage />;
@@ -70,6 +61,7 @@ export default function App() {
       case 'settlement': return <SettlementPage />;
       case 'analytics':  return <AnalyticsPage />;
       case 'categories': return <CategoriesPage />;
+      case 'inbox':      return <InboxPage />;
       case 'settings':   return <SettingsPage />;
     }
   };
@@ -82,22 +74,20 @@ export default function App() {
       case 'settlement': return <HandshakeIcon fontSize="small" />;
       case 'analytics':  return <BarChartIcon fontSize="small" />;
       case 'categories': return <CategoryIcon fontSize="small" />;
+      case 'inbox':      return <NotificationBadge />;
       case 'settings':   return <SettingsIcon fontSize="small" />;
     }
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
-      {/* AppBar */}
       <AppBar position="static" elevation={0} sx={{
         backgroundColor: 'background.paper',
         borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary'
       }}>
         <Toolbar variant="dense" sx={{ minHeight: 52 }}>
           <Box
-            component="img"
-            src="favicon.svg"
-            alt="Expense Manager"
+            component="img" src="public/favicon.svg" alt="Expense Manager"
             sx={{ width: 34, height: 34, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
           />
           <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
@@ -112,16 +102,12 @@ export default function App() {
         </Toolbar>
       </AppBar>
 
-      {/* Body */}
       <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
         {isDesktop ? (
           <Box sx={{ display: 'flex', width: '100%' }}>
-            {/* Sidebar */}
             <Box sx={{
-              width: 200, flexShrink: 0,
-              borderRight: '1px solid', borderColor: 'divider',
-              display: 'flex', flexDirection: 'column', py: 2, gap: 0.5,
-              overflowY: 'auto'
+              width: 200, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider',
+              display: 'flex', flexDirection: 'column', py: 2, gap: 0.5, overflowY: 'auto'
             }}>
               {SIDEBAR_TABS.map(t => {
                 const active = tab === t && !subPage;
@@ -140,9 +126,7 @@ export default function App() {
                     }}
                   >
                     {tabIcon(t)}
-                    <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'capitalize' }}>
-                      {TAB_LABELS[t]}
-                    </Typography>
+                    <Typography variant="body2" fontWeight={600}>{TAB_LABELS[t]}</Typography>
                   </Box>
                 );
               })}
@@ -154,17 +138,11 @@ export default function App() {
         )}
       </Box>
 
-      {/* Mobile bottom nav — 6 tabs fitting on screen */}
       {!isDesktop && (
         <Paper elevation={0} sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
           <BottomNavigation value={tab} onChange={handleTabChange} showLabels>
             {BOTTOM_TABS.map(t => (
-              <BottomNavigationAction
-                key={t}
-                label={BOTTOM_LABELS[t]}
-                value={t}
-                icon={tabIcon(t)}
-              />
+              <BottomNavigationAction key={t} label={BOTTOM_LABELS[t]} value={t} icon={tabIcon(t)} />
             ))}
           </BottomNavigation>
         </Paper>

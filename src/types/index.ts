@@ -2,14 +2,15 @@ export interface Friend {
   id: string;
   name: string;
   active: boolean;
+  linkedEmail?: string;   // Gmail for collaborative notifications
   createdAt: number;
 }
 
 export interface Category {
   id: string;
   name: string;
-  icon: string;   // emoji
-  color: string;  // hex
+  icon: string;
+  color: string;
   createdAt: number;
   isDefault?: boolean;
 }
@@ -18,12 +19,14 @@ export interface QuickExpense {
   id: string;
   name: string;
   amount: number;
-  categoryId: string;   // default category for this quick expense
+  categoryId: string;
   createdAt: number;
 }
 
 export type PaidBy = 'me' | string;
 export type PaidFor = 'me' | string;
+
+export type ConfirmationStatus = 'none' | 'pending' | 'accepted' | 'rejected' | 'expired';
 
 export interface Expense {
   id: string;
@@ -34,7 +37,10 @@ export interface Expense {
   amount: number;
   paidBy: PaidBy;
   paidFor: PaidFor;
-  categoryId: string;   // NEW — defaults to 'other'
+  categoryId: string;
+  // Collaborative confirmation
+  confirmationStatus: ConfirmationStatus;
+  notificationId?: string;   // Firebase notification ID if sent
   createdAt: number;
   updatedAt: number;
 }
@@ -58,13 +64,11 @@ export interface Budget {
 }
 
 export interface DriveBackupMeta {
-  // Session info (persisted so silent re-auth works on next open)
   email: string;
   name: string;
   picture: string;
   hint: string;
   connectedAt: number;
-  // Backup metadata
   lastBackupAt: number | null;
   lastBackupFileName: string | null;
   lastBackupSize: number | null;
@@ -76,7 +80,33 @@ export interface AppSettings {
   darkMode: boolean;
   currency: string;
   driveBackup?: DriveBackupMeta;
+  firebaseUid?: string;      // persisted Firebase UID for session awareness
   updatedAt: number;
+}
+
+// ── Firebase notification (lives in Firebase Realtime DB, NOT IndexedDB) ──────
+export type NotificationDirection = 'i_paid_for_you' | 'you_paid_for_me';
+
+export interface FirebaseNotification {
+  id: string;                // Firebase push key
+  fromUid: string;
+  fromEmail: string;
+  fromName: string;
+  expenseId: string;         // local expense ID on sender's side
+  expenseName: string;
+  amount: number;
+  date: string;
+  time: string;
+  categoryId: string;
+  categoryName: string;
+  direction: NotificationDirection;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: number;
+  expiresAt: number;         // createdAt + 7 days
+  recipientUid?: string;     // present only on the sender's own mirror copy
+                              // (sentNotifications/{senderUid}/{id}) — lets the
+                              // sender delete/reference the recipient's copy
+                              // without an extra lookup
 }
 
 export interface DBSchema {
@@ -114,7 +144,6 @@ export interface ExpenseFormData {
   categoryId: string;
 }
 
-// Default categories seeded on first run
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'food',          name: 'Food',          icon: '🍔', color: '#E53935', createdAt: 0, isDefault: true },
   { id: 'transport',     name: 'Transport',     icon: '🚌', color: '#1E88E5', createdAt: 0, isDefault: true },

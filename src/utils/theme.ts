@@ -137,11 +137,11 @@ export const getTheme = (mode: 'light' | 'dark') =>
       MuiBottomNavigationAction: {
         styleOverrides: {
           root: {
-            minWidth: 40,
-            padding: '6px 4px',
+            minWidth: 34,
+            padding: '6px 2px',
             '& .MuiBottomNavigationAction-label': {
-              fontSize: '0.65rem',
-              '&.Mui-selected': { fontSize: '0.7rem' }
+              fontSize: '0.6rem',
+              '&.Mui-selected': { fontSize: '0.65rem' }
             },
             '&.Mui-selected': {
               color: '#F57C00'   // orange active state

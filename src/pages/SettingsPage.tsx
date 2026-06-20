@@ -148,8 +148,9 @@ export default function SettingsPage() {
             <List disablePadding dense>
               {[
                 ['App', 'Expense Manager'],
-                ['Version', '2.3.0'],
+                ['Version', '3.0.0'],
                 ['Storage', 'IndexedDB (fully offline) / Google Drive (optional backup)'],
+                ['Collaborative', 'Real-time payment confirmations between linked accounts'],
                 ['Records', `${expenses.length} expenses · ${friends.length} friends · ${categories.length} categories`],
               ].map(([label, value]) => (
                 <ListItem key={label} disablePadding sx={{ py: 0.25 }}>
@@ -161,6 +162,15 @@ export default function SettingsPage() {
                 </ListItem>
               ))}
             </List>
+
+            <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ letterSpacing: '0.06em' }}>
+                WHAT'S NEW IN 3.0
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, lineHeight: 1.6 }}>
+                Link a friend's Gmail and send them a live payment notification — they Accept or Reject right from their own app, and you see their response instantly in your Inbox. No more "did you actually pay them back" guesswork.
+              </Typography>
+            </Box>
           </CardContent>
         </Card>
       </Box>

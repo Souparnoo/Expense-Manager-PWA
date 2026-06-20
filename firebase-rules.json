@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "notifications": {
+      "$recipientUid": {
+        ".read": "$recipientUid === auth.uid",
+        ".write": "auth.uid !== null"
+      }
+    },
+    "sentNotifications": {
+      "$senderUid": {
+        ".read": "$senderUid === auth.uid",
+        ".write": "auth.uid !== null"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth.uid !== null",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "emailIndex": {
+      ".read": "auth.uid !== null",
+      "$emailKey": {
+        ".write": "auth.uid !== null"
+      }
+    }
+  }
+}

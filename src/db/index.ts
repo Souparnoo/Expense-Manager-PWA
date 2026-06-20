@@ -3,7 +3,7 @@ import type { Friend, QuickExpense, Expense, Settlement, Budget, AppSettings, Ca
 import { DEFAULT_CATEGORIES } from '../types';
 
 const DB_NAME = 'expense-manager-db';
-const DB_VERSION = 2;  // bumped for categories store
+const DB_VERSION = 3;  // bumped for notifications store
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -45,6 +45,14 @@ export async function getDB(): Promise<IDBPDatabase> {
       // ── v2: categories store ────────────────────────────────────────────────
       if (!db.objectStoreNames.contains('categories')) {
         db.createObjectStore('categories', { keyPath: 'id' });
+      }
+
+      // ── v3: local notification status cache ──────────────────────────────────
+      // Stores sent notification IDs so we can watch their status in Firebase
+      if (!db.objectStoreNames.contains('notificationCache')) {
+        const s = db.createObjectStore('notificationCache', { keyPath: 'notificationId' });
+        s.createIndex('expenseId', 'expenseId');
+        s.createIndex('recipientUid', 'recipientUid');
       }
     },
     async blocked() {},
@@ -257,4 +265,36 @@ export async function importAllData(data: any): Promise<void> {
   }
 
   await tx.done;
+}
+
+// ─── Notification Cache ───────────────────────────────────────────────────────
+// Tracks notification IDs we sent so RecentTransactions can watch their status
+
+export interface NotificationCacheEntry {
+  notificationId: string;
+  expenseId: string;
+  recipientUid: string;
+  recipientEmail: string;
+  createdAt: number;
+}
+
+export async function saveNotificationCache(entry: NotificationCacheEntry): Promise<void> {
+  const db = await getDB();
+  await db.put('notificationCache', entry);
+}
+
+export async function getNotificationCacheByExpense(expenseId: string): Promise<NotificationCacheEntry | undefined> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('notificationCache', 'expenseId', expenseId);
+  return all[0];
+}
+
+export async function getAllNotificationCache(): Promise<NotificationCacheEntry[]> {
+  const db = await getDB();
+  return db.getAll('notificationCache');
+}
+
+export async function deleteNotificationCache(notificationId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('notificationCache', notificationId);
 }
