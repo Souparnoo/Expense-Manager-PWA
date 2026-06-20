@@ -353,9 +353,14 @@ export default function InboxPage() {
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
           <Button onClick={() => setConfirmDialog(null)} color="inherit" variant="outlined">Cancel</Button>
           <Button
-            onClick={() => confirmDialog?.type === 'accept'
-              ? handleAccept(confirmDialog.notification)
-              : handleReject(confirmDialog.notification)}
+            onClick={() => {
+              if (!confirmDialog) return;
+              if (confirmDialog.type === 'accept') {
+                handleAccept(confirmDialog.notification);
+              } else {
+                handleReject(confirmDialog.notification);
+              }
+            }}
             variant="contained"
             color={confirmDialog?.type === 'accept' ? 'success' : 'error'}
             disabled={Boolean(actionLoading)}
