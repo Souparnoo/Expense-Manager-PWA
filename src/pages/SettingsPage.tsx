@@ -148,7 +148,7 @@ export default function SettingsPage() {
             <List disablePadding dense>
               {[
                 ['App', 'Expense Manager'],
-                ['Version', '3.0.0'],
+                ['Version', '1.3.1'],
                 ['Storage', 'IndexedDB (fully offline) / Google Drive (optional backup)'],
                 ['Collaborative', 'Real-time payment confirmations between linked accounts'],
                 ['Records', `${expenses.length} expenses · ${friends.length} friends · ${categories.length} categories`],
@@ -165,10 +165,11 @@ export default function SettingsPage() {
 
             <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
               <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ letterSpacing: '0.06em' }}>
-                WHAT'S NEW IN 3.0
+                WHAT'S NEW IN 1.3
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, lineHeight: 1.6 }}>
-                Link a friend's Gmail and send them a live payment notification — they Accept or Reject right from their own app, and you see their response instantly in your Inbox. No more "did you actually pay them back" guesswork.
+                1.3.0 -- Link a friend's Gmail and send them a live payment notification — they Accept or Reject right from their own app, and you see their response instantly in your Inbox. No more "did you actually pay them back" guesswork.
+                1.3.1 -- Now you can add mutiple friends to a single expense, and each friend gets same identical expense entry. Useful for group dinners or shared bills.
               </Typography>
             </Box>
           </CardContent>

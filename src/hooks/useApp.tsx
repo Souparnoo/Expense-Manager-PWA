@@ -33,11 +33,13 @@ interface AppContextType {
   selectedTime: string;
   selectedPaidBy: string;
   selectedPaidFor: string;
+  selectedPaidForMulti: string[];   // when length > 1, expense fans out to each
   selectedCategoryId: string;
   setSelectedDate: (d: string) => void;
   setSelectedTime: (t: string) => void;
   setSelectedPaidBy: (v: string) => void;
   setSelectedPaidFor: (v: string) => void;
+  setSelectedPaidForMulti: (v: string[]) => void;
   setSelectedCategoryId: (v: string) => void;
 }
 
@@ -65,6 +67,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedTime, setSelectedTime] = useState(getCurrentTime());
   const [selectedPaidBy, setSelectedPaidBy] = useState('me');
   const [selectedPaidFor, setSelectedPaidFor] = useState('me');
+  const [selectedPaidForMulti, setSelectedPaidForMulti] = useState<string[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('other');
 
   const reloadFriends = useCallback(async () => {
@@ -135,8 +138,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reloadFriends, reloadQuickExpenses, reloadExpenses, reloadSettlements,
       reloadBudgets, reloadCategories, reloadAll,
       updateSettings,
-      selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedCategoryId,
-      setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedCategoryId
+      selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedPaidForMulti, selectedCategoryId,
+      setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedPaidForMulti, setSelectedCategoryId
     }}>
       {children}
     </AppContext.Provider>

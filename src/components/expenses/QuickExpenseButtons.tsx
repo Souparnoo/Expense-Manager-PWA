@@ -16,7 +16,7 @@ const INITIAL_CATEGORY = 'other';
 export default function QuickExpenseButtons({ onManage }: Props) {
   const {
     quickExpenses, categories, friends,
-    selectedDate, selectedTime, selectedPaidBy, selectedPaidFor,
+    selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedPaidForMulti,
     selectedCategoryId, reloadExpenses
   } = useApp();
   const { firebaseUser, refreshSentWatchers } = useFirebaseAuth();
@@ -29,43 +29,39 @@ export default function QuickExpenseButtons({ onManage }: Props) {
 
   const getCat = (id: string) => categories.find(c => c.id === id);
 
-  // Alphabetical order on the home page (storage order is by createdAt — keep
-  // that for the management page, but Home should be easy to scan A→Z)
   const sortedQuickExpenses = [...quickExpenses].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
   );
 
-  const handleClick = async (qe: { id: string; name: string; amount: number; categoryId: string }) => {
-    if (didLongPress.current) return;
-    const userChangedCategory = selectedCategoryId !== INITIAL_CATEGORY;
-    const resolvedCategoryId = userChangedCategory ? selectedCategoryId : (qe.categoryId || 'other');
-
+  // One expense for a single paidBy/paidFor pair — shared by single and
+  // multi-select fan-out paths, including the notification flow.
+  const createOneExpense = async (
+    expenseName: string, amt: number, categoryId: string,
+    paidBy: string, paidFor: string
+  ): Promise<{ sentTo: string | null; notNotified: string | null }> => {
     const expense: Expense = {
       id: generateId(),
       date: selectedDate,
       time: selectedTime,
       timestamp: new Date(`${selectedDate}T${selectedTime}`).getTime(),
-      name: qe.name,
-      amount: qe.amount,
-      paidBy: selectedPaidBy,
-      paidFor: selectedPaidFor,
-      categoryId: resolvedCategoryId,
+      name: expenseName,
+      amount: amt,
+      paidBy,
+      paidFor,
+      categoryId,
       confirmationStatus: 'none',
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
 
-    const catName = getCat(resolvedCategoryId)?.name ?? 'Other';
-
-    // Determine notification direction (covers BOTH Me→Friend and Friend→Me)
     let notifyFriendId: string | null = null;
     let direction: NotificationDirection | null = null;
 
-    if (selectedPaidBy === 'me' && selectedPaidFor !== 'me') {
-      notifyFriendId = selectedPaidFor;
+    if (paidBy === 'me' && paidFor !== 'me') {
+      notifyFriendId = paidFor;
       direction = 'i_paid_for_you';
-    } else if (selectedPaidBy !== 'me' && selectedPaidFor === 'me') {
-      notifyFriendId = selectedPaidBy;
+    } else if (paidBy !== 'me' && paidFor === 'me') {
+      notifyFriendId = paidBy;
       direction = 'you_paid_for_me';
     }
 
@@ -74,7 +70,6 @@ export default function QuickExpenseButtons({ onManage }: Props) {
       if (friend?.linkedEmail) {
         expense.confirmationStatus = 'pending';
         await db.saveExpense(expense);
-        await reloadExpenses();
 
         const notifId = await sendPaymentNotification(expense, friend, {
           uid: firebaseUser.uid,
@@ -84,19 +79,53 @@ export default function QuickExpenseButtons({ onManage }: Props) {
 
         if (notifId) {
           await db.saveExpense({ ...expense, notificationId: notifId });
-          await reloadExpenses();
-          refreshSentWatchers();
-          setToast(`${qe.name} ₹${qe.amount} → ${catName} · Sent to ${friend.name}`);
-        } else {
-          setToast(`${qe.name} ₹${qe.amount} → ${catName} (${friend.name} not on app yet)`);
+          return { sentTo: friend.name, notNotified: null };
         }
-        return;
+        return { sentTo: null, notNotified: friend.name };
       }
     }
 
     await db.saveExpense(expense);
+    return { sentTo: null, notNotified: null };
+  };
+
+  const handleClick = async (qe: { id: string; name: string; amount: number; categoryId: string }) => {
+    if (didLongPress.current) return;
+    const userChangedCategory = selectedCategoryId !== INITIAL_CATEGORY;
+    const resolvedCategoryId = userChangedCategory ? selectedCategoryId : (qe.categoryId || 'other');
+    const catName = getCat(resolvedCategoryId)?.name ?? 'Other';
+    const isMulti = selectedPaidForMulti.length > 1;
+
+    if (isMulti) {
+      const sentNames: string[] = [];
+      const skippedNames: string[] = [];
+
+      for (const friendId of selectedPaidForMulti) {
+        const result = await createOneExpense(qe.name, qe.amount, resolvedCategoryId, 'me', friendId);
+        if (result.sentTo) sentNames.push(result.sentTo);
+        if (result.notNotified) skippedNames.push(result.notNotified);
+      }
+
+      await reloadExpenses();
+      if (sentNames.length > 0) refreshSentWatchers();
+
+      let msg = `${qe.name} ₹${qe.amount} → ${catName} added for ${selectedPaidForMulti.length} people!`;
+      if (sentNames.length > 0) msg += ` Notified: ${sentNames.join(', ')}.`;
+      setToast(msg);
+      return;
+    }
+
+    const result = await createOneExpense(qe.name, qe.amount, resolvedCategoryId, selectedPaidBy, selectedPaidFor);
     await reloadExpenses();
-    setToast(`${qe.name} ₹${qe.amount} → ${catName}`);
+
+    if (result.sentTo) {
+      refreshSentWatchers();
+      setToast(`${qe.name} ₹${qe.amount} → ${catName} · Sent to ${result.sentTo}`);
+    } else if (result.notNotified) {
+      setToast(`${qe.name} ₹${qe.amount} → ${catName} (${result.notNotified} not on app yet)`);
+    } else {
+      setToast(`${qe.name} ₹${qe.amount} → ${catName}`);
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent, id: string) => {
@@ -164,7 +193,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
         <MenuItem onClick={() => { onManage(); setMenuAnchor(null); }}>Delete</MenuItem>
       </Menu>
 
-      <Snackbar open={Boolean(toast)} autoHideDuration={3000} onClose={() => setToast(null)}
+      <Snackbar open={Boolean(toast)} autoHideDuration={3500} onClose={() => setToast(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity="success" variant="filled" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>
           {toast}
