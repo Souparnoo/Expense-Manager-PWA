@@ -126,7 +126,7 @@ export default function App() {
       }}>
         <Toolbar variant="dense" sx={{ minHeight: 52 }}>
           <Box
-            component="img" src="/pwa-192x192.png" alt="Expense Manager"
+            component="img" src="pwa-192x192.png" alt="Expense Manager"
             sx={{ width: 34, height: 34, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
           />
           <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
