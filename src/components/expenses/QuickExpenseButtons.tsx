@@ -4,6 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useApp } from '../../hooks/useApp';
 import { useFirebaseAuth } from '../../hooks/useFirebaseAuth';
+import { useTour } from '../../hooks/useTour';
 import * as db from '../../db';
 import { generateId } from '../../utils';
 import { sendPaymentNotification } from '../../utils/notifications';
@@ -21,6 +22,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
     selectedCategoryId, settings, reloadExpenses
   } = useApp();
   const { firebaseUser, refreshSentWatchers } = useFirebaseAuth();
+  const { onQuickChipTapped, onQEFabTapped, phase, captured } = useTour();
 
   const [toast, setToast] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -156,7 +158,9 @@ export default function QuickExpenseButtons({ onManage }: Props) {
           QUICK ADD
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <IconButton size="small" onClick={onManage} sx={{ opacity: 0.6 }}>
+        <IconButton size="small" data-tour="qe-fab"
+          onClick={() => { if (phase === 'p2-quick-fab') onQEFabTapped(); onManage(); }}
+          sx={{ opacity: 0.6 }}>
           <AddIcon fontSize="small" />
         </IconButton>
       </Box>
@@ -169,18 +173,21 @@ export default function QuickExpenseButtons({ onManage }: Props) {
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {sortedQuickExpenses.map(qe => {
             const cat = getCat(qe.categoryId || 'other');
+            const isTourTarget = phase === 'p5-quick-chip' && qe.name === captured.qeName;
             return (
               <Chip
                 key={qe.id}
+                data-tour={isTourTarget ? 'quick-chip-active' : undefined}
                 label={`${cat?.icon ?? '📦'} ${qe.name} ₹${qe.amount}`}
-                onClick={() => handleClick(qe)}
+                onClick={() => { if (isTourTarget) onQuickChipTapped(); handleClick(qe); }}
                 onTouchStart={e => handleTouchStart(e, qe.id)}
                 onTouchEnd={handleTouchEnd}
                 onContextMenu={e => handleContextMenu(e, qe.id)}
                 variant="outlined" size="medium"
                 sx={{
                   fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
-                  borderColor: cat?.color ?? 'divider',
+                  borderColor: isTourTarget ? 'warning.main' : (cat?.color ?? 'divider'),
+                  boxShadow: isTourTarget ? '0 0 0 2px rgba(245,124,0,0.3)' : undefined,
                   '&:hover': { backgroundColor: cat ? `${cat.color}22` : 'action.selected', borderColor: cat?.color, color: cat?.color },
                   '&:active': { transform: 'scale(0.96)' }
                 }}

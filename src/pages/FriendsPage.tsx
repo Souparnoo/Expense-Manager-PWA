@@ -17,6 +17,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useApp } from '../hooks/useApp';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
+import { useTour } from '../hooks/useTour';
 import { findUserByEmail, isFirebaseConfigured } from '../utils/firebase';
 import * as db from '../db';
 import { generateId, formatCurrency, calcFriendBalances } from '../utils';
@@ -39,6 +40,7 @@ export default function FriendsPage() {
   const [emailCheckStatus, setEmailCheckStatus] = useState<'idle' | 'checking' | 'found' | 'not_found'>('idle');
   const [emailCheckTimer, setEmailCheckTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const { firebaseUser } = useFirebaseAuth();
+  const { onFriendFabTapped, onFriendSaved, phase } = useTour();
 
   const balances = calcFriendBalances(expenses, settlements, friends);
 
@@ -48,6 +50,7 @@ export default function FriendsPage() {
     setEmailInput('');
     setEmailCheckStatus('idle');
     setOpen(true);
+    if (phase === 'p1-friends-fab') onFriendFabTapped();
   };
 
   const openEdit = (f: Friend) => {
@@ -89,6 +92,7 @@ export default function FriendsPage() {
     await db.saveFriend(friend);
     await reloadFriends();
     setOpen(false);
+    if (phase === 'p1-friend-dialog' && !editing) onFriendSaved(name);
   };
 
   const handleDelete = async () => {
@@ -200,7 +204,7 @@ export default function FriendsPage() {
         )}
       </Box>
 
-      <Fab color="primary" onClick={openAdd} sx={{ position: 'fixed', bottom: 80, right: 20 }}>
+      <Fab color="primary" onClick={openAdd} data-tour="friends-fab" sx={{ position: 'fixed', bottom: 80, right: 20 }}>
         <AddIcon />
       </Fab>
 
@@ -208,7 +212,7 @@ export default function FriendsPage() {
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>{editing ? 'Edit Friend' : 'Add Friend'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Box data-tour="friend-dialog" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               label="Name" value={nameInput}
               onChange={e => setNameInput(e.target.value)}

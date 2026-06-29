@@ -23,6 +23,7 @@ import QuickExpensesPage from './pages/QuickExpensesPage';
 import FriendHistoryPage from './pages/FriendHistoryPage';
 import InboxPage from './pages/InboxPage';
 import NotificationBadge from './components/common/NotificationBadge';
+import TourOverlay from './components/tour/TourOverlay';
 import { useTour } from './hooks/useTour';
 import { useApp } from './hooks/useApp';
 
@@ -48,8 +49,16 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [subPage, setSubPage] = useState<SubPage>(null);
   const isDesktop = useMediaQuery('(min-width:768px)');
-  const { startTour } = useTour();
+  const { startTour, registerNavigate, onFriendsNavTapped, onInboxNavTapped, phase } = useTour();
   const { settings } = useApp();
+
+  // Register the navigation function with the tour so it can drive page changes
+  useEffect(() => {
+    registerNavigate((newTab: string, newSubPage?: string) => {
+      setTab(newTab as Tab);
+      setSubPage((newSubPage as SubPage) ?? null);
+    });
+  }, [registerNavigate]);
 
   // Auto-start tour on very first launch (tourCompleted not yet persisted)
   useEffect(() => {
@@ -61,7 +70,22 @@ export default function App() {
   }, []); // intentionally run only once on mount
 
   const handleTabChange = (_: React.SyntheticEvent, val: Tab) => {
+    // During tour p1-nav-friends, tapping Friends advances the phase
+    if (phase === 'p1-nav-friends' && val === 'friends') {
+      onFriendsNavTapped();
+    }
+    // During tour p6-inbox-nav, tapping Inbox advances the phase
+    if (phase === 'p6-inbox-nav' && val === 'inbox') {
+      onInboxNavTapped();
+    }
     setTab(val); setSubPage(null);
+  };
+
+  // Sidebar nav click handler (desktop)
+  const handleSidebarTabClick = (t: Tab) => {
+    if (phase === 'p1-nav-friends' && t === 'friends') onFriendsNavTapped();
+    if (phase === 'p6-inbox-nav' && t === 'inbox') onInboxNavTapped();
+    setTab(t); setSubPage(null);
   };
 
   const renderContent = () => {
@@ -94,6 +118,8 @@ export default function App() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+      {/* Global tour overlay — renders above all pages */}
+      <TourOverlay />
       <AppBar position="static" elevation={0} sx={{
         backgroundColor: 'background.paper',
         borderBottom: '1px solid', borderColor: 'divider', color: 'text.primary'
@@ -125,7 +151,7 @@ export default function App() {
               {SIDEBAR_TABS.map(t => {
                 const active = tab === t && !subPage;
                 return (
-                  <Box key={t} onClick={() => { setTab(t); setSubPage(null); }}
+                  <Box key={t} onClick={() => handleSidebarTabClick(t)}
                     data-tour={`nav-${t}`}
                     sx={{
                       mx: 1, px: 2, py: 1.5, borderRadius: 2, cursor: 'pointer',

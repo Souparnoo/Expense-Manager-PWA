@@ -10,6 +10,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
 import { useApp } from '../../hooks/useApp';
+import { useTour } from '../../hooks/useTour';
 
 // Sentinel: clicking this in the dropdown opens the person-picker popup
 const MULTI_SENTINEL = '__multi__';
@@ -26,6 +27,7 @@ export default function TransactionSelectors() {
   const [multiDialogOpen, setMultiDialogOpen] = useState(false);
   // draftSelection includes 'me' as a possible entry alongside friend IDs
   const [draftSelection, setDraftSelection] = useState<string[]>([]);
+  const { onPaidForOpened, onMultiSelectChosen, onMultiSelectConfirmed, phase } = useTour();
 
   const isMultiActive = selectedPaidForMulti.length > 0;
 
@@ -41,6 +43,7 @@ export default function TransactionSelectors() {
   const handlePaidForChange = (value: string) => {
     notifyPaidForTouched();
     if (value === MULTI_SENTINEL) {
+      if (phase === 'p4-paid-for-open') onMultiSelectChosen();
       // Pre-fill popup with current selection
       const current = isMultiActive
         ? selectedPaidForMulti
@@ -80,6 +83,7 @@ export default function TransactionSelectors() {
       setSelectedPaidForMulti(draftSelection);
       setSelectedPaidBy('me');
       setSelectedPaidFor('me'); // kept harmless while multi is active
+      if (phase === 'p4-paid-for-checkbox') onMultiSelectConfirmed();
     }
     setMultiDialogOpen(false);
   };
@@ -150,6 +154,7 @@ export default function TransactionSelectors() {
             }}
             fullWidth
             SelectProps={{
+              onOpen: () => { if (phase === 'p4-home-paid-for') onPaidForOpened(); },
               renderValue: () =>
                 isMultiActive
                   ? multiSummary
@@ -161,6 +166,7 @@ export default function TransactionSelectors() {
             {activeFriends.length > 0 && [
               <Divider key="div" />,
               <MenuItem key={MULTI_SENTINEL} value={MULTI_SENTINEL}
+                data-tour="multi-select-option"
                 sx={{ color: 'primary.main', fontWeight: 600 }}>
                 <GroupIcon fontSize="small" sx={{ mr: 1 }} />
                 Select multiple people…
@@ -172,7 +178,7 @@ export default function TransactionSelectors() {
 
       {/* Info chip */}
       {isMultiActive ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+        <Box data-tour="paid-for-chips" sx={{ display: 'flex', justifyContent: 'center' }}>
           <Chip
             size="small" color="primary"
             icon={<GroupIcon sx={{ fontSize: '16px !important' }} />}
@@ -217,7 +223,7 @@ export default function TransactionSelectors() {
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, maxHeight: 380, overflowY: 'auto' }}>
-          <List disablePadding>
+          <List data-tour="paid-for-checkboxes" disablePadding>
             {/* Me as first checkbox option */}
             <ListItem disablePadding>
               <ListItemButton onClick={() => togglePerson('me')} dense>

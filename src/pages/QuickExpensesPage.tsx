@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box, List, ListItem, ListItemText, ListItemSecondaryAction,
   IconButton, Fab, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -9,6 +9,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useApp } from '../hooks/useApp';
+import { useTour } from '../hooks/useTour';
 import * as db from '../db';
 import { generateId, formatCurrency } from '../utils';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -22,6 +23,18 @@ interface Props {
 
 export default function QuickExpensesPage({ onBack }: Props) {
   const { quickExpenses, categories, settings, reloadQuickExpenses } = useApp();
+  const { onQEFabTapped, onQESaved, phase } = useTour();
+
+  // When the tour sends us here (phase p2-quick-dialog), auto-open the add dialog
+  useEffect(() => {
+    if (phase === 'p2-quick-dialog') {
+      setEditing(null);
+      setNameInput('');
+      setAmountInput('');
+      setCategoryInput('other');
+      setOpen(true);
+    }
+  }, []); // only on mount — phase won't change while this page is mounted for this step
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<QuickExpense | null>(null);
@@ -41,6 +54,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
     setAmountInput('');
     setCategoryInput('other');
     setOpen(true);
+    if (phase === 'p2-quick-fab') onQEFabTapped();
   };
 
   const openEdit = (qe: QuickExpense) => {
@@ -67,6 +81,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
     await db.saveQuickExpense(qe);
     await reloadQuickExpenses();
     setOpen(false);
+    if (phase === 'p2-quick-dialog' && !editing) onQESaved(name, String(amount));
   };
 
   const handleDelete = async () => {
@@ -159,7 +174,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
         )}
       </Box>
 
-      <Fab color="primary" onClick={openAdd} sx={{ position: 'fixed', bottom: 80, right: 20 }}>
+      <Fab color="primary" onClick={openAdd} data-tour="qe-fab" sx={{ position: 'fixed', bottom: 80, right: 20 }}>
         <AddIcon />
       </Fab>
 
@@ -179,7 +194,7 @@ export default function QuickExpensesPage({ onBack }: Props) {
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>{editing ? 'Edit Quick Expense' : 'Add Quick Expense'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Box data-tour="qe-dialog" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               label="Name" value={nameInput}
               onChange={e => setNameInput(e.target.value)}
