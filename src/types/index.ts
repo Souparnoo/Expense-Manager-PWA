@@ -80,7 +80,8 @@ export interface AppSettings {
   darkMode: boolean;
   currency: string;
   driveBackup?: DriveBackupMeta;
-  firebaseUid?: string;      // persisted Firebase UID for session awareness
+  firebaseUid?: string;
+  tourCompleted?: boolean;   // true once user has finished or skipped the onboarding tour
   updatedAt: number;
 }
 

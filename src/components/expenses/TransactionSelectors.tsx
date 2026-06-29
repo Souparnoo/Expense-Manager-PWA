@@ -11,191 +11,182 @@ import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
 import { useApp } from '../../hooks/useApp';
 
-// Sentinel value shown as the last option in the Paid For dropdown —
-// selecting it opens the multi-select popup instead of picking a single friend.
+// Sentinel: clicking this in the dropdown opens the person-picker popup
 const MULTI_SENTINEL = '__multi__';
 
 export default function TransactionSelectors() {
   const {
     friends,
     selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedPaidForMulti,
-    setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedPaidForMulti
+    setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedPaidForMulti,
+    notifyPaidByTouched, notifyPaidForTouched
   } = useApp();
 
   const activeFriends = friends.filter(f => f.active);
   const [multiDialogOpen, setMultiDialogOpen] = useState(false);
+  // draftSelection includes 'me' as a possible entry alongside friend IDs
   const [draftSelection, setDraftSelection] = useState<string[]>([]);
 
   const isMultiActive = selectedPaidForMulti.length > 0;
 
   const handlePaidByChange = (value: string) => {
+    notifyPaidByTouched();
     setSelectedPaidBy(value);
     if (value !== 'me') {
-      // Friend pays → Paid For must be Me, locked, and multi-select doesn't apply
       setSelectedPaidFor('me');
       setSelectedPaidForMulti([]);
     }
   };
 
   const handlePaidForChange = (value: string) => {
+    notifyPaidForTouched();
     if (value === MULTI_SENTINEL) {
-      // Open the popup, pre-filling with whatever was last chosen (or just
-      // the current single selection as a starting point)
-      setDraftSelection(selectedPaidForMulti.length > 0 ? selectedPaidForMulti : []);
+      // Pre-fill popup with current selection
+      const current = isMultiActive
+        ? selectedPaidForMulti
+        : selectedPaidFor === 'me'
+          ? ['me']
+          : [selectedPaidFor];
+      setDraftSelection(current);
       setMultiDialogOpen(true);
       return;
     }
-    setSelectedPaidForMulti([]); // leaving multi mode
+    setSelectedPaidForMulti([]);
     setSelectedPaidFor(value);
-    if (value !== 'me') {
-      // I pay for a friend → Paid By must be Me, locked
-      setSelectedPaidBy('me');
-    }
+    if (value !== 'me') setSelectedPaidBy('me');
   };
 
-  const toggleDraftFriend = (friendId: string) => {
+  const togglePerson = (id: string) => {
     setDraftSelection(prev =>
-      prev.includes(friendId) ? prev.filter(id => id !== friendId) : [...prev, friendId]
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
   const handleConfirmMulti = () => {
+    notifyPaidForTouched();
     if (draftSelection.length === 0) {
-      // Nothing picked — treat as cancel, fall back to single 'me'
       setMultiDialogOpen(false);
       return;
     }
+
     if (draftSelection.length === 1) {
-      // Only one friend selected — no need for multi mode, behaves like normal single-select
+      // Single selection — use normal single-select mode
+      const only = draftSelection[0];
       setSelectedPaidForMulti([]);
-      setSelectedPaidFor(draftSelection[0]);
+      setSelectedPaidFor(only);
+      if (only !== 'me') setSelectedPaidBy('me');
     } else {
+      // Multiple people selected — multi mode
       setSelectedPaidForMulti(draftSelection);
-      setSelectedPaidFor('me'); // not used while multi is active, kept harmless
+      setSelectedPaidBy('me');
+      setSelectedPaidFor('me'); // kept harmless while multi is active
     }
-    setSelectedPaidBy('me'); // multi-pay only makes sense when I'm the one paying
     setMultiDialogOpen(false);
   };
 
   const isPaidByLocked = selectedPaidFor !== 'me' || isMultiActive;
   const isPaidForLocked = selectedPaidBy !== 'me';
 
-  // What the Paid For field displays — special label when multi is active
   const paidForDisplayValue = isMultiActive ? MULTI_SENTINEL : selectedPaidFor;
 
-  const multiNames = selectedPaidForMulti
-    .map(id => activeFriends.find(f => f.id === id)?.name)
-    .filter(Boolean) as string[];
+  // Human-readable labels for the multi chip
+  const multiLabels = selectedPaidForMulti.map(id =>
+    id === 'me' ? 'Me' : activeFriends.find(f => f.id === id)?.name ?? id
+  );
+
+  // Summary display for the dropdown when multi is active
+  const multiSummary = multiLabels.length <= 3
+    ? multiLabels.join(', ')
+    : `${multiLabels.slice(0, 2).join(', ')} +${multiLabels.length - 2} more`;
 
   return (
     <Box sx={{ px: 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      {/* Date & Time Row */}
+
+      {/* Date & Time */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
         <TextField
-          label="Date"
-          type="date"
-          size="small"
-          value={selectedDate}
+          label="Date" type="date" size="small" value={selectedDate}
           onChange={e => setSelectedDate(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <CalendarTodayIcon fontSize="small" />
-              </InputAdornment>
-            )
-          }}
-          InputLabelProps={{ shrink: true }}
-          fullWidth
+          InputProps={{ startAdornment: <InputAdornment position="start"><CalendarTodayIcon fontSize="small" /></InputAdornment> }}
+          InputLabelProps={{ shrink: true }} fullWidth
         />
         <TextField
-          label="Time"
-          type="time"
-          size="small"
-          value={selectedTime}
+          label="Time" type="time" size="small" value={selectedTime}
           onChange={e => setSelectedTime(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <AccessTimeIcon fontSize="small" />
-              </InputAdornment>
-            )
-          }}
-          InputLabelProps={{ shrink: true }}
-          fullWidth
+          InputProps={{ startAdornment: <InputAdornment position="start"><AccessTimeIcon fontSize="small" /></InputAdornment> }}
+          InputLabelProps={{ shrink: true }} fullWidth
         />
       </Box>
 
-      {/* Paid By & Paid For Row */}
+      {/* Paid By & Paid For */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-        <TextField
-          label="Paid By"
-          select
-          size="small"
-          value={selectedPaidBy}
-          onChange={e => handlePaidByChange(e.target.value)}
-          disabled={isPaidByLocked}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <PersonIcon fontSize="small" />
-              </InputAdornment>
-            )
-          }}
-          fullWidth
-        >
-          <MenuItem value="me">Me</MenuItem>
-          {activeFriends.map(f => (
-            <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
-          ))}
-        </TextField>
 
-        <TextField
-          label="Paid For"
-          select
-          size="small"
-          value={paidForDisplayValue}
-          onChange={e => handlePaidForChange(e.target.value)}
-          disabled={isPaidForLocked}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                {isMultiActive ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}
-              </InputAdornment>
-            )
-          }}
-          fullWidth
-          SelectProps={{
-            renderValue: () =>
-              isMultiActive
-                ? `Me + ${selectedPaidForMulti.length} friend${selectedPaidForMulti.length > 1 ? 's' : ''}`
-                : (selectedPaidFor === 'me' ? 'Me' : activeFriends.find(f => f.id === selectedPaidFor)?.name ?? 'Me')
-          }}
-        >
-          <MenuItem value="me">Me</MenuItem>
-          {activeFriends.map(f => (
-            <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
-          ))}
-          {activeFriends.length > 0 && [
-            <Divider key="multi-divider" />,
-            <MenuItem key={MULTI_SENTINEL} value={MULTI_SENTINEL} sx={{ color: 'primary.main', fontWeight: 600 }}>
-              <GroupIcon fontSize="small" sx={{ mr: 1 }} />
-              Me + Multiple Friends…
-            </MenuItem>
-          ]}
-        </TextField>
+        <Box data-tour="paid-by">
+          <TextField
+            label="Paid By" select size="small"
+            value={selectedPaidBy}
+            onChange={e => handlePaidByChange(e.target.value)}
+            disabled={isPaidByLocked}
+            InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon fontSize="small" /></InputAdornment> }}
+            fullWidth
+          >
+            <MenuItem value="me">Me</MenuItem>
+            {activeFriends.map(f => <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>)}
+          </TextField>
+        </Box>
+
+        <Box data-tour="paid-for">
+          <TextField
+            label="Paid For" select size="small"
+            value={paidForDisplayValue}
+            onChange={e => handlePaidForChange(e.target.value)}
+            disabled={isPaidForLocked}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  {isMultiActive ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}
+                </InputAdornment>
+              )
+            }}
+            fullWidth
+            SelectProps={{
+              renderValue: () =>
+                isMultiActive
+                  ? multiSummary
+                  : (selectedPaidFor === 'me' ? 'Me' : activeFriends.find(f => f.id === selectedPaidFor)?.name ?? 'Me')
+            }}
+          >
+            <MenuItem value="me">Me</MenuItem>
+            {activeFriends.map(f => <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>)}
+            {activeFriends.length > 0 && [
+              <Divider key="div" />,
+              <MenuItem key={MULTI_SENTINEL} value={MULTI_SENTINEL}
+                sx={{ color: 'primary.main', fontWeight: 600 }}>
+                <GroupIcon fontSize="small" sx={{ mr: 1 }} />
+                Select multiple people…
+              </MenuItem>
+            ]}
+          </TextField>
+        </Box>
       </Box>
 
-      {/* Transaction info chip(s) */}
+      {/* Info chip */}
       {isMultiActive ? (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Chip
-            size="small"
-            color="primary"
+            size="small" color="primary"
             icon={<GroupIcon sx={{ fontSize: '16px !important' }} />}
-            label={`Same amount for: Me, ${multiNames.join(', ')}`}
-            onDelete={() => setMultiDialogOpen(true)}
-            deleteIcon={<Typography variant="caption" sx={{ px: 0.5, fontWeight: 700 }}>Edit</Typography>}
-            sx={{ fontWeight: 600, maxWidth: '100%', '& .MuiChip-label': { whiteSpace: 'normal' } }}
+            label={`Recording for: ${multiLabels.join(', ')}`}
+            onClick={() => {
+              setDraftSelection(selectedPaidForMulti);
+              setMultiDialogOpen(true);
+            }}
+            onDelete={() => {
+              setSelectedPaidForMulti([]);
+              setSelectedPaidFor('me');
+            }}
+            sx={{ fontWeight: 600, maxWidth: '100%', cursor: 'pointer',
+              '& .MuiChip-label': { whiteSpace: 'normal' } }}
           />
         </Box>
       ) : (selectedPaidBy !== 'me' || selectedPaidFor !== 'me') && (
@@ -213,42 +204,57 @@ export default function TransactionSelectors() {
         </Box>
       )}
 
-      {/* Multi-select popup */}
+      {/* Person-picker popup — Me is also a selectable option here */}
       <Dialog open={multiDialogOpen} onClose={() => setMultiDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <GroupIcon color="primary" />
-            Split Same Amount Among
+            Select people
           </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 400, mt: 0.5 }}>
-            Each person gets their own entry for the full amount you'll enter below — useful when everyone ordered the same thing.
+          <Typography variant="caption" color="text.secondary"
+            sx={{ display: 'block', fontWeight: 400, mt: 0.5 }}>
+            Each selected person gets their own expense entry for the same amount — ideal when everyone had the same thing.
           </Typography>
         </DialogTitle>
-        <DialogContent dividers sx={{ p: 0, maxHeight: 360 }}>
+        <DialogContent dividers sx={{ p: 0, maxHeight: 380, overflowY: 'auto' }}>
           <List disablePadding>
-            {activeFriends.map(f => {
-              const checked = draftSelection.includes(f.id);
-              return (
-                <ListItem key={f.id} disablePadding>
-                  <ListItemButton onClick={() => toggleDraftFriend(f.id)} dense>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <Checkbox edge="start" checked={checked} tabIndex={-1} disableRipple />
-                    </ListItemIcon>
-                    <Avatar sx={{ width: 28, height: 28, fontSize: '0.8rem', mr: 1.5, bgcolor: 'primary.main' }}>
-                      {f.name[0]}
-                    </Avatar>
-                    <ListItemText primary={f.name} />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
+            {/* Me as first checkbox option */}
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => togglePerson('me')} dense>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <Checkbox edge="start" checked={draftSelection.includes('me')} tabIndex={-1} disableRipple />
+                </ListItemIcon>
+                <Avatar sx={{ width: 28, height: 28, fontSize: '0.8rem', mr: 1.5, bgcolor: 'secondary.main' }}>
+                  M
+                </Avatar>
+                <ListItemText primary="Me" secondary="yourself" />
+              </ListItemButton>
+            </ListItem>
+
+            {activeFriends.length > 0 && <Divider />}
+
+            {activeFriends.map(f => (
+              <ListItem key={f.id} disablePadding>
+                <ListItemButton onClick={() => togglePerson(f.id)} dense>
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    <Checkbox edge="start" checked={draftSelection.includes(f.id)} tabIndex={-1} disableRipple />
+                  </ListItemIcon>
+                  <Avatar sx={{ width: 28, height: 28, fontSize: '0.8rem', mr: 1.5, bgcolor: 'primary.main' }}>
+                    {f.name[0]}
+                  </Avatar>
+                  <ListItemText primary={f.name} />
+                </ListItemButton>
+              </ListItem>
+            ))}
           </List>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
           <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
             {draftSelection.length} selected
           </Typography>
-          <Button onClick={() => setMultiDialogOpen(false)} color="inherit" variant="outlined">Cancel</Button>
+          <Button onClick={() => setMultiDialogOpen(false)} color="inherit" variant="outlined">
+            Cancel
+          </Button>
           <Button onClick={handleConfirmMulti} variant="contained" disabled={draftSelection.length === 0}>
             Confirm
           </Button>

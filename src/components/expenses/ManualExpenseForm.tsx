@@ -6,6 +6,7 @@ import { useFirebaseAuth } from '../../hooks/useFirebaseAuth';
 import * as db from '../../db';
 import { generateId } from '../../utils';
 import { sendPaymentNotification } from '../../utils/notifications';
+import { scheduleAutoBackup } from '../../utils/autoBackup';
 import type { Expense, NotificationDirection } from '../../types';
 
 export default function ManualExpenseForm() {
@@ -103,6 +104,7 @@ export default function ManualExpenseForm() {
       }
 
       await reloadExpenses();
+      scheduleAutoBackup(settings);
       if (sentNames.length > 0) refreshSentWatchers();
 
       const count = selectedPaidForMulti.length;
@@ -112,6 +114,7 @@ export default function ManualExpenseForm() {
     } else {
       const result = await createOneExpense(trimmedName, amt, selectedPaidBy, selectedPaidFor);
       await reloadExpenses();
+      scheduleAutoBackup(settings);
 
       if (result.sentTo) {
         refreshSentWatchers();

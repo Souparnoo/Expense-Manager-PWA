@@ -35,21 +35,12 @@ interface AppContextType {
   selectedPaidFor: string;
   selectedPaidForMulti: string[];   // when length > 1, expense fans out to each
   selectedCategoryId: string;
-  // Monotonically incrementing counters — fire on every interaction even
-  // if the selected value doesn't change (e.g. "Me" selected when already "Me").
-  // Used by the tour watcher to advance on any dropdown interaction.
-  paidByTouched: number;
-  paidForTouched: number;
-  categoryTouched: number;
   setSelectedDate: (d: string) => void;
   setSelectedTime: (t: string) => void;
   setSelectedPaidBy: (v: string) => void;
   setSelectedPaidFor: (v: string) => void;
   setSelectedPaidForMulti: (v: string[]) => void;
   setSelectedCategoryId: (v: string) => void;
-  notifyPaidByTouched: () => void;
-  notifyPaidForTouched: () => void;
-  notifyCategoryTouched: () => void;
 }
 
 const defaultSettings: AppSettings = {
@@ -81,12 +72,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ignored and each entry gets its own identical expense on save.
   const [selectedPaidForMulti, setSelectedPaidForMulti] = useState<string[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('other');
-  const [paidByTouched, setPaidByTouched] = useState(0);
-  const [paidForTouched, setPaidForTouched] = useState(0);
-  const [categoryTouched, setCategoryTouched] = useState(0);
-  const notifyPaidByTouched   = () => setPaidByTouched(n => n + 1);
-  const notifyPaidForTouched  = () => setPaidForTouched(n => n + 1);
-  const notifyCategoryTouched = () => setCategoryTouched(n => n + 1);
 
   const reloadFriends = useCallback(async () => {
     setFriends(await db.getAllFriends());
@@ -157,9 +142,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reloadBudgets, reloadCategories, reloadAll,
       updateSettings,
       selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedPaidForMulti, selectedCategoryId,
-      paidByTouched, paidForTouched, categoryTouched,
-      setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedPaidForMulti, setSelectedCategoryId,
-      notifyPaidByTouched, notifyPaidForTouched, notifyCategoryTouched,
+      setSelectedDate, setSelectedTime, setSelectedPaidBy, setSelectedPaidFor, setSelectedPaidForMulti, setSelectedCategoryId
     }}>
       {children}
     </AppContext.Provider>

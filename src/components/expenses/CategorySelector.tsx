@@ -11,7 +11,7 @@ import * as db from '../../db';
 import { generateId } from '../../utils';
 
 export default function CategorySelector() {
-  const { categories, selectedCategoryId, setSelectedCategoryId, reloadCategories } = useApp();
+  const { categories, selectedCategoryId, setSelectedCategoryId, reloadCategories, notifyCategoryTouched } = useApp();
 
   const [addOpen, setAddOpen] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -64,7 +64,7 @@ export default function CategorySelector() {
             <Chip
               key={cat.id}
               label={`${cat.icon} ${cat.name}`}
-              onClick={() => setSelectedCategoryId(cat.id)}
+              onClick={() => { setSelectedCategoryId(cat.id); notifyCategoryTouched(); }}
               size="medium"
               sx={{
                 fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',

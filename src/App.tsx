@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, BottomNavigation, BottomNavigationAction, Paper,
   AppBar, Toolbar, Typography, IconButton, useMediaQuery
@@ -23,6 +23,8 @@ import QuickExpensesPage from './pages/QuickExpensesPage';
 import FriendHistoryPage from './pages/FriendHistoryPage';
 import InboxPage from './pages/InboxPage';
 import NotificationBadge from './components/common/NotificationBadge';
+import { useTour } from './hooks/useTour';
+import { useApp } from './hooks/useApp';
 
 type Tab = 'home' | 'history' | 'friends' | 'settlement' | 'analytics' | 'categories' | 'inbox' | 'settings';
 type SubPage = 'quick-expenses' | 'friend-history' | null;
@@ -46,6 +48,17 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [subPage, setSubPage] = useState<SubPage>(null);
   const isDesktop = useMediaQuery('(min-width:768px)');
+  const { startTour } = useTour();
+  const { settings } = useApp();
+
+  // Auto-start tour on very first launch (tourCompleted not yet persisted)
+  useEffect(() => {
+    if (!settings.tourCompleted) {
+      const t = setTimeout(() => startTour(), 800);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run only once on mount
 
   const handleTabChange = (_: React.SyntheticEvent, val: Tab) => {
     setTab(val); setSubPage(null);
@@ -87,7 +100,7 @@ export default function App() {
       }}>
         <Toolbar variant="dense" sx={{ minHeight: 52 }}>
           <Box
-            component="img" src="favicon.svg" alt="Expense Manager"
+            component="img" src="/pwa-192x192.png" alt="Expense Manager"
             sx={{ width: 34, height: 34, borderRadius: 2, mr: 1.5, objectFit: 'contain' }}
           />
           <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
@@ -113,6 +126,7 @@ export default function App() {
                 const active = tab === t && !subPage;
                 return (
                   <Box key={t} onClick={() => { setTab(t); setSubPage(null); }}
+                    data-tour={`nav-${t}`}
                     sx={{
                       mx: 1, px: 2, py: 1.5, borderRadius: 2, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: 1.5,
@@ -142,7 +156,13 @@ export default function App() {
         <Paper elevation={0} sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
           <BottomNavigation value={tab} onChange={handleTabChange} showLabels>
             {BOTTOM_TABS.map(t => (
-              <BottomNavigationAction key={t} label={BOTTOM_LABELS[t]} value={t} icon={tabIcon(t)} />
+              <BottomNavigationAction
+                key={t}
+                label={BOTTOM_LABELS[t]}
+                value={t}
+                icon={tabIcon(t)}
+                data-tour={`nav-${t}`}
+              />
             ))}
           </BottomNavigation>
         </Paper>

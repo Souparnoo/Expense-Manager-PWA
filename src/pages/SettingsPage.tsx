@@ -8,7 +8,9 @@ import UploadIcon from '@mui/icons-material/Upload';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import InfoIcon from '@mui/icons-material/Info';
+import SchoolIcon from '@mui/icons-material/School';
 import { useApp } from '../hooks/useApp';
+import { useTour } from '../hooks/useTour';
 import * as db from '../db';
 import { exportToExcel } from '../utils/excel';
 import PageHeader from '../components/common/PageHeader';
@@ -16,6 +18,7 @@ import DriveBackupCard from '../components/settings/DriveBackupCard';
 
 export default function SettingsPage() {
   const { settings, updateSettings, expenses, friends, settlements, categories, reloadAll } = useApp();
+  const { startTour } = useTour();
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -138,6 +141,27 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Replay Tour */}
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <SchoolIcon fontSize="small" color="primary" />
+              <Typography fontWeight={700}>App Tour</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Walk through the key features of the app step by step — Paid By/For, categories, quick add, history, analytics, and more.
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<SchoolIcon />}
+              onClick={startTour}
+              fullWidth
+            >
+              Replay Onboarding Tour
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* About */}
         <Card>
           <CardContent>
@@ -148,7 +172,7 @@ export default function SettingsPage() {
             <List disablePadding dense>
               {[
                 ['App', 'Expense Manager'],
-                ['Version', '1.3.1'],
+                ['Version', '3.0.0'],
                 ['Storage', 'IndexedDB (fully offline) / Google Drive (optional backup)'],
                 ['Collaborative', 'Real-time payment confirmations between linked accounts'],
                 ['Records', `${expenses.length} expenses · ${friends.length} friends · ${categories.length} categories`],
@@ -165,11 +189,10 @@ export default function SettingsPage() {
 
             <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
               <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ letterSpacing: '0.06em' }}>
-                WHAT'S NEW IN 1.3
+                WHAT'S NEW IN 3.0
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, lineHeight: 1.6 }}>
-                1.3.0 -- Link a friend's Gmail and send them a live payment notification — they Accept or Reject right from their own app, and you see their response instantly in your Inbox. No more "did you actually pay them back" guesswork.
-                1.3.1 -- Now you can add mutiple friends to a single expense, and each friend gets same identical expense entry. Useful for group dinners or shared bills.
+                Link a friend's Gmail and send them a live payment notification — they Accept or Reject right from their own app, and you see their response instantly in your Inbox. No more "did you actually pay them back" guesswork.
               </Typography>
             </Box>
           </CardContent>

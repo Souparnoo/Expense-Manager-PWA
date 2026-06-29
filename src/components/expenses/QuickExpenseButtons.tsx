@@ -7,6 +7,7 @@ import { useFirebaseAuth } from '../../hooks/useFirebaseAuth';
 import * as db from '../../db';
 import { generateId } from '../../utils';
 import { sendPaymentNotification } from '../../utils/notifications';
+import { scheduleAutoBackup } from '../../utils/autoBackup';
 import type { Expense, NotificationDirection } from '../../types';
 
 interface Props { onManage: () => void; }
@@ -17,7 +18,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
   const {
     quickExpenses, categories, friends,
     selectedDate, selectedTime, selectedPaidBy, selectedPaidFor, selectedPaidForMulti,
-    selectedCategoryId, reloadExpenses
+    selectedCategoryId, settings, reloadExpenses
   } = useApp();
   const { firebaseUser, refreshSentWatchers } = useFirebaseAuth();
 
@@ -107,6 +108,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
       }
 
       await reloadExpenses();
+      scheduleAutoBackup(settings);
       if (sentNames.length > 0) refreshSentWatchers();
 
       let msg = `${qe.name} ₹${qe.amount} → ${catName} added for ${selectedPaidForMulti.length} people!`;
@@ -117,6 +119,7 @@ export default function QuickExpenseButtons({ onManage }: Props) {
 
     const result = await createOneExpense(qe.name, qe.amount, resolvedCategoryId, selectedPaidBy, selectedPaidFor);
     await reloadExpenses();
+    scheduleAutoBackup(settings);
 
     if (result.sentTo) {
       refreshSentWatchers();
