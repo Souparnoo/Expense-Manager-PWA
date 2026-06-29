@@ -66,7 +66,6 @@ function requestToken(hint: string, prompt: string): Promise<string> {
       hint,
       callback: (response: any) => {
         if (response.error) {
-          // popup_closed_by_user or access_denied — user cancelled
           reject(new Error(response.error === 'access_denied' ? 'Sign-in cancelled.' : response.error));
         } else {
           accessToken = response.access_token;
@@ -79,19 +78,15 @@ function requestToken(hint: string, prompt: string): Promise<string> {
 }
 
 // ── Silent sign-in (on app load) ─────────────────────────────────────────────
-// Returns session if silently re-authed, null if not previously connected.
-// Never shows a popup — if silent fails, returns null gracefully.
 
 export async function silentSignIn(savedSession: DriveSession | null): Promise<DriveSession | null> {
   if (!isDriveConfigured() || !savedSession) return null;
   try {
     await loadGISScript();
-    // prompt: '' means silent — GIS will use the browser's existing Google session
     const token = await requestToken(savedSession.hint, '');
     accessToken = token;
-    return savedSession; // session is still valid
+    return savedSession;
   } catch {
-    // Silent auth failed (no active Google session in browser) — user must sign in manually
     accessToken = null;
     return null;
   }
@@ -110,7 +105,7 @@ export async function signInWithGoogle(): Promise<DriveSession> {
     email: userInfo.email,
     name: userInfo.name,
     picture: userInfo.picture,
-    hint: userInfo.email,   // used for silent re-auth next time
+    hint: userInfo.email,
     connectedAt: Date.now(),
   };
   return session;
@@ -142,7 +137,6 @@ async function driveRequest(url: string, options: RequestInit = {}): Promise<Res
     },
   });
   if (res.status === 401) {
-    // Token expired — clear it so UI shows reconnect prompt
     accessToken = null;
     throw new Error('Session expired. Please reconnect Google Drive.');
   }

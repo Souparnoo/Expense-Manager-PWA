@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, BottomNavigation, BottomNavigationAction, Paper,
   AppBar, Toolbar, Typography, IconButton, useMediaQuery
@@ -50,7 +50,7 @@ export default function App() {
   const [subPage, setSubPage] = useState<SubPage>(null);
   const isDesktop = useMediaQuery('(min-width:768px)');
   const { startTour, registerNavigate, onFriendsNavTapped, onInboxNavTapped, phase } = useTour();
-  const { settings } = useApp();
+  const { settings, loading } = useApp();
 
   // Register the navigation function with the tour so it can drive page changes
   useEffect(() => {
@@ -60,14 +60,17 @@ export default function App() {
     });
   }, [registerNavigate]);
 
-  // Auto-start tour on very first launch (tourCompleted not yet persisted)
+  // Only start tour after settings have loaded from DB — prevents false-starting
+  // every reload because defaultSettings has no tourCompleted flag
+  const tourStartedRef = useRef(false);
   useEffect(() => {
-    if (!settings.tourCompleted) {
-      const t = setTimeout(() => startTour(), 800);
-      return () => clearTimeout(t);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run only once on mount
+    if (loading) return;                        // DB not ready yet
+    if (tourStartedRef.current) return;         // already started this session
+    if (settings.tourCompleted) return;         // user already did/skipped it
+    tourStartedRef.current = true;
+    const t = setTimeout(() => startTour(), 800);
+    return () => clearTimeout(t);
+  }, [loading, settings.tourCompleted]);
 
   const handleTabChange = (_: React.SyntheticEvent, val: Tab) => {
     // During tour p1-nav-friends, tapping Friends advances the phase
